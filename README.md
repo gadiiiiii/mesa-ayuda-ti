@@ -4,7 +4,7 @@
 
 Mesa de ayuda e inventario de equipos para el soporte informático de una oficina municipal. Se registran los tickets, cada uno con un **plazo según su prioridad**, y se asocian a los equipos del inventario para ver el historial de fallas de cada uno.
 
-Es una demo pública: no tiene inicio de sesión, los datos son inventados y cualquiera puede volver a los datos de ejemplo desde el panel.
+**Demo: [mesa-ayuda-ti.vercel.app](https://mesa-ayuda-ti.vercel.app)**. Es pública: no tiene inicio de sesión, los datos son inventados y cualquiera puede volver a los datos de ejemplo desde el panel.
 
 <p>
   <img src="docs/panel.png" alt="Panel con los pendientes, los vencidos y los tickets que requieren atención" width="64%">
