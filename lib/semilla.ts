@@ -1,12 +1,13 @@
 import { nuevoCodigo } from "./codigo";
 import type { BD } from "./db";
 import { aLocal, desdeLocal, habilesEntre, sumarDia, sumarHabiles, ventana } from "./horario";
-import { equipos, eventos, tickets } from "./db/esquema";
+import { equipos, eventos, reglasAsignacion, tecnicos, tickets } from "./db/esquema";
 import {
   HORAS_PLAZO,
   PREFIJO_TIPO,
   TECNICOS,
   UNIDADES,
+  REGLAS_INICIALES,
   calcularVencimiento,
   esEventoPublico,
   estaPendiente,
@@ -318,6 +319,16 @@ function momentoHabil(az: ReturnType<typeof crearAzar>, ahora: Date, diasAtras: 
 }
 
 export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; tickets: number }> {
+  // Reglas de asignación y disponibilidad como al comienzo.
+  await bd
+    .insert(reglasAsignacion)
+    .values(Object.entries(REGLAS_INICIALES).map(([categoria, r]) => ({ categoria: categoria as Categoria, ...r })))
+    .onConflictDoNothing();
+  await bd
+    .insert(tecnicos)
+    .values(TECNICOS.map((nombre) => ({ nombre })))
+    .onConflictDoNothing();
+
   const az = crearAzar(20261028);
   const persona = () => `${az.elegir(NOMBRES)} ${az.elegir(APELLIDOS)}`;
 

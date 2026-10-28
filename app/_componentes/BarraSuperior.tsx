@@ -2,11 +2,14 @@ import Link from "next/link";
 import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { tecnicoActual } from "@/app/sesion";
+import { contarMisPendientes } from "@/lib/datos";
+import { obtenerBD } from "@/lib/db";
 import Navegacion from "./Navegacion";
 import SelectorTecnico from "./SelectorTecnico";
 
 export default async function BarraSuperior() {
   const tecnico = await tecnicoActual();
+  const misPendientes = await contarMisPendientes(await obtenerBD(), tecnico);
   return (
     <header className="border-b border-border bg-card">
       <div className="mx-auto flex max-w-[76rem] flex-wrap items-center gap-x-6 gap-y-2 px-4 pt-3 sm:px-6 lg:flex-nowrap lg:pt-0">
@@ -18,7 +21,7 @@ export default async function BarraSuperior() {
           </svg>
           Mesa de ayuda TI
         </Link>
-        <Navegacion className="order-3 w-full lg:order-2 lg:w-auto" />
+        <Navegacion className="order-3 w-full lg:order-2 lg:w-auto" misPendientes={misPendientes} />
         <div className="order-2 ml-auto flex items-center gap-3 lg:order-3">
           <SelectorTecnico actual={tecnico} />
           <Button asChild size="sm" className="hidden sm:inline-flex">

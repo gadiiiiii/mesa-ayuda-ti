@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACCIONES, ESTADOS, accionPara, calcularVencimiento, duracion, plazo, siguienteCodigo, textoPlazo } from "./dominio";
+import { ACCIONES, ESTADOS, elegirTecnico, accionPara, calcularVencimiento, duracion, plazo, siguienteCodigo, textoPlazo } from "./dominio";
 
 const H = 3_600_000;
 
@@ -87,5 +87,28 @@ describe("códigos de inventario", () => {
     expect(siguienteCodigo("notebook", [])).toBe("NB-0001");
     expect(siguienteCodigo("notebook", ["NB-0001", "NB-0009", "PC-0040", "NB-0003"])).toBe("NB-0010");
     expect(siguienteCodigo("impresora", ["IMP-0002", "IMPX-0099"])).toBe("IMP-0003");
+  });
+});
+
+describe("asignación automática", () => {
+  const todos = ["Camila Rojas", "Diego Fuentes", "Valentina Soto"];
+  const carga = new Map([
+    ["Camila Rojas", 5],
+    ["Diego Fuentes", 2],
+    ["Valentina Soto", 2],
+  ]);
+  it("cola: no asigna", () => {
+    expect(elegirTecnico({ modo: "cola", tecnico: null }, todos, carga)).toBeNull();
+  });
+  it("especialista, si está disponible", () => {
+    expect(elegirTecnico({ modo: "tecnico", tecnico: "Camila Rojas" }, todos, carga)).toBe("Camila Rojas");
+  });
+  it("si el especialista no está, al de menos carga (empate: el primero de la lista)", () => {
+    expect(elegirTecnico({ modo: "tecnico", tecnico: "Camila Rojas" }, ["Diego Fuentes", "Valentina Soto"], carga)).toBe("Diego Fuentes");
+    expect(elegirTecnico({ modo: "menos_carga", tecnico: null }, todos, carga)).toBe("Diego Fuentes");
+    expect(elegirTecnico({ modo: "menos_carga", tecnico: null }, ["Camila Rojas", "Valentina Soto"], carga)).toBe("Valentina Soto");
+  });
+  it("sin nadie disponible queda en la cola", () => {
+    expect(elegirTecnico({ modo: "menos_carga", tecnico: null }, [], carga)).toBeNull();
   });
 });

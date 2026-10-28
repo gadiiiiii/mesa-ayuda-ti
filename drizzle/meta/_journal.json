@@ -22,6 +22,13 @@
       "when": 1793201129895,
       "tag": "0002_portal",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793201616041,
+      "tag": "0003_asignacion",
+      "breakpoints": true
     }
   ]
 }

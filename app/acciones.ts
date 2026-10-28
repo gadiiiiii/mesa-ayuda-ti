@@ -11,11 +11,12 @@ import {
   crearEquipo,
   crearSolicitud,
   crearTicket,
+  guardarReglas,
   responderSolicitante,
   vaciar,
 } from "@/lib/datos";
 import { obtenerBD } from "@/lib/db";
-import { esTecnico } from "@/lib/dominio";
+import { CATEGORIAS, MODOS_ASIGNACION, esTecnico, type Categoria, type ModoAsignacion, type Regla } from "@/lib/dominio";
 import { normalizarCodigo } from "@/lib/codigo";
 import { sembrar } from "@/lib/semilla";
 import {
@@ -146,4 +147,21 @@ export async function accionResponderSolicitante(_: EstadoFormulario, form: Form
   if (!r.ok) return { mensaje: r.error, valores: valores(form) };
   revalidatePath("/", "layout");
   return { ok: Date.now(), mensaje: r.valor.reabierto ? "Reabrimos tu solicitud." : "Mensaje enviado." };
+}
+
+// ── Asignación automática ──────────────────────────────────────────────────
+
+export async function accionGuardarReglas(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const reglas = {} as Record<Categoria, Regla>;
+  for (const c of CATEGORIAS) {
+    const valor = String(form.get(`regla-${c}`) ?? "cola");
+    const [modo, tecnico] = valor.split(":") as [ModoAsignacion, string | undefined];
+    if (!MODOS_ASIGNACION.includes(modo) || (modo === "tecnico" && !esTecnico(tecnico)))
+      return { mensaje: "Regla no válida. Recarga la página." };
+    reglas[c] = { modo, tecnico: modo === "tecnico" ? tecnico! : null };
+  }
+  const disponibles = form.getAll("disponible").filter(esTecnico);
+  await guardarReglas(await obtenerBD(), reglas, disponibles);
+  revalidatePath("/", "layout");
+  return { ok: Date.now() };
 }

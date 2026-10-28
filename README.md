@@ -49,6 +49,12 @@ Los técnicos eligen en cada comentario si es una **nota interna** o una **respu
 
 <img src="docs/seguimiento.png" alt="Seguimiento de una solicitud en el portal, con la respuesta del técnico y la solución" width="64%">
 
+### Mis tickets y asignación automática
+
+**Mis tickets** reúne lo que tiene asignado el técnico (los que vencen antes, primero), los pendientes sin técnico que puede tomar y lo que resolvió en la semana. La barra superior muestra cuántos pendientes tiene.
+
+Cada categoría tiene una **regla de asignación** para los tickets nuevos, vengan de la mesa o del portal: dejarlos en la cola, darlos siempre a un especialista (por ejemplo, redes y telefonía a Diego) o al técnico disponible con menos pendientes. Quien está de vacaciones o con licencia se marca como no disponible: no recibe tickets nuevos y los de su especialidad se reparten entre los demás. El historial muestra «Se asignó automáticamente a…».
+
 ### Inventario
 
 Equipos con código de inventario correlativo por tipo (`NB-0007`, `IMP-0012`, `SW-0002`…), marca, modelo, serie, unidad, responsable, estado (en uso, en bodega, en reparación, de baja), IP y MAC. La IP y la MAC se validan y se normalizan: la MAC se acepta con dos puntos, guiones o en formato Cisco (`001a.2b3c.4d5e`). La ficha de cada equipo muestra todos sus tickets y permite crear uno nuevo ya asociado.
@@ -104,7 +110,7 @@ Para cambiar el esquema: edita `lib/db/esquema.ts` y genera la migración con `n
 - [x] Tickets con plazos, historial y asignación; inventario; panel; demo pública con datos de ejemplo.
 - [x] Plazos en horas hábiles, con feriados y pausa mientras el ticket está en espera.
 - [x] Portal para que cualquier funcionario pida ayuda y siga su ticket con un código.
-- [ ] «Mis tickets» y asignación automática.
+- [x] «Mis tickets» y asignación automática por categoría, carga y disponibilidad.
 - [ ] Tickets relacionados: duplicados y problemas que agrupan varios tickets.
 - [ ] Base de conocimiento y respuestas predefinidas.
 - [ ] Métricas de tiempos y encuesta de satisfacción.

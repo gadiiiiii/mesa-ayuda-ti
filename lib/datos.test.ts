@@ -4,6 +4,10 @@ import {
   actualizarAsignacion,
   cambiarEstado,
   comentar,
+  contarMisPendientes,
+  guardarReglas,
+  misTickets,
+  reglasIniciales,
   crearEquipo,
   crearSolicitud,
   crearTicket,
@@ -165,6 +169,49 @@ describe("inventario", () => {
       ok: false,
       error: "El equipo elegido ya no existe.",
     });
+  });
+});
+
+describe("asignación automática", () => {
+  it("aplica la regla de la categoría y anota quién asignó", async () => {
+    await reglasIniciales(bd);
+    const r = await crearTicket(bd, nuevoTicket({ categoria: "red" }), "Camila Rojas", t0);
+    const d = (await obtenerTicket(bd, r.ok ? r.valor : 0))!;
+    expect(d.ticket.tecnico).toBe("Diego Fuentes");
+    expect(d.eventos.map((e) => [e.tipo, e.autor, e.hacia])).toEqual([
+      ["creado", "Camila Rojas", null],
+      ["asignacion", "Asignación automática", "Diego Fuentes"],
+    ]);
+    const s = await crearTicket(bd, nuevoTicket({ categoria: "software" }), "Camila Rojas", t0);
+    expect((await obtenerTicket(bd, s.ok ? s.valor : 0))!.ticket.tecnico).toBeNull();
+  });
+
+  it("reparte por carga y salta a quien no está disponible", async () => {
+    await reglasIniciales(bd);
+    // Diego (especialista en redes) de vacaciones: va a quien tenga menos pendientes.
+    const reglas = (await import("./dominio")).REGLAS_INICIALES;
+    await guardarReglas(bd, reglas, ["Camila Rojas", "Valentina Soto"]);
+    const asignados: (string | null)[] = [];
+    for (let i = 0; i < 4; i++) {
+      const r = await crearTicket(bd, nuevoTicket({ categoria: i % 2 ? "hardware" : "red" }), "Camila Rojas", t0);
+      asignados.push((await obtenerTicket(bd, r.ok ? r.valor : 0))!.ticket.tecnico);
+    }
+    expect(asignados).toEqual(["Camila Rojas", "Valentina Soto", "Camila Rojas", "Valentina Soto"]);
+  });
+
+  it("«Mis tickets» separa lo asignado, lo que se puede tomar y lo resuelto", async () => {
+    const a = await crearTicket(bd, nuevoTicket(), "Camila Rojas", t0);
+    const b = await crearTicket(bd, nuevoTicket({ titulo: "Sin internet en Obras" }), "Camila Rojas", t0);
+    const c = await crearTicket(bd, nuevoTicket({ titulo: "Cambiar tóner" }), "Camila Rojas", t0);
+    const [ia, , ic] = [a, b, c].map((r) => (r.ok ? r.valor : 0));
+    await cambiarEstado(bd, ia, "en_curso", null, "Valentina Soto", despues(1));
+    await cambiarEstado(bd, ic, "en_curso", null, "Valentina Soto", despues(1));
+    await cambiarEstado(bd, ic, "resuelto", "Listo.", "Valentina Soto", despues(2));
+    const m = await misTickets(bd, "Valentina Soto", despues(3));
+    expect(m.asignados.map((t) => t.id)).toEqual([ia]);
+    expect(m.porTomar.map((t) => t.titulo)).toEqual(["Sin internet en Obras"]);
+    expect(m.resueltos.map((t) => t.id)).toEqual([ic]);
+    expect(await contarMisPendientes(bd, "Valentina Soto")).toBe(1);
   });
 });
 

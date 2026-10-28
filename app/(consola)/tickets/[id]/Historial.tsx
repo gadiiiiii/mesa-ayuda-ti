@@ -1,6 +1,6 @@
 import { ArrowRightLeftIcon, MessageSquareIcon, PlusCircleIcon, SignalIcon, UserRoundIcon } from "lucide-react";
 import type { Evento } from "@/lib/db/esquema";
-import { NOMBRE_ESTADO, NOMBRE_PRIORIDAD, type Estado, type Prioridad } from "@/lib/dominio";
+import { AUTOR_SISTEMA, NOMBRE_ESTADO, NOMBRE_PRIORIDAD, type Estado, type Prioridad } from "@/lib/dominio";
 import { formatearFechaHora, hace } from "@/lib/formato";
 
 interface Contexto {
@@ -20,6 +20,14 @@ function describir(e: Evento, c: Contexto): { texto: React.ReactNode; nota?: str
       return { texto: delSolicitante ? <>{quien} escribió desde el portal</> : <>{quien} respondió al solicitante</>, nota: e.texto ?? "" };
     case "asignacion":
       if (!e.hacia) return { texto: <>{quien} dejó el ticket sin asignar</> };
+      if (e.autor === AUTOR_SISTEMA)
+        return {
+          texto: (
+            <>
+              Se asignó automáticamente a <strong className="font-semibold">{e.hacia}</strong>
+            </>
+          ),
+        };
       if (e.hacia === e.autor) return { texto: <>{quien} se asignó el ticket</> };
       return {
         texto: (

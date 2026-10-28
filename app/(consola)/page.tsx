@@ -155,9 +155,14 @@ export default async function Panel() {
         </section>
 
         <section aria-labelledby="titulo-tecnicos" className="rounded-lg border border-border bg-card p-5">
-          <h2 id="titulo-tecnicos" className="text-lg font-bold">
-            Carga por técnico
-          </h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <h2 id="titulo-tecnicos" className="text-lg font-bold">
+              Carga por técnico
+            </h2>
+            <Link href="/asignacion" className="text-sm font-semibold text-primary hover:underline">
+              Reglas de asignación
+            </Link>
+          </div>
           <Barras
             max={maxTec}
             filas={r.porTecnico.map((t) => ({

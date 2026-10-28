@@ -296,6 +296,49 @@ export const TECNICOS = ["Camila Rojas", "Diego Fuentes", "Valentina Soto"] as c
 export type Tecnico = (typeof TECNICOS)[number];
 export const esTecnico = (x: unknown): x is Tecnico => typeof x === "string" && (TECNICOS as readonly string[]).includes(x);
 
+// ── Asignación automática ──────────────────────────────────────────────────
+
+/**
+ * Para cada categoría: dejar el ticket en la cola, dárselo a un técnico en particular (el especialista)
+ * o al técnico disponible con menos tickets pendientes.
+ */
+export const MODOS_ASIGNACION = ["cola", "tecnico", "menos_carga"] as const;
+export type ModoAsignacion = (typeof MODOS_ASIGNACION)[number];
+
+export interface Regla {
+  modo: ModoAsignacion;
+  tecnico: string | null;
+}
+
+/**
+ * A quién va un ticket nuevo. Si el especialista no está disponible, se reparte por carga.
+ * Con empate de carga gana el primero de la lista de técnicos. Null: queda en la cola.
+ */
+export function elegirTecnico(regla: Regla, disponibles: readonly string[], carga: ReadonlyMap<string, number>): string | null {
+  if (regla.modo === "cola") return null;
+  if (regla.modo === "tecnico" && regla.tecnico && disponibles.includes(regla.tecnico)) return regla.tecnico;
+  let elegido: string | null = null;
+  for (const t of TECNICOS) {
+    if (!disponibles.includes(t)) continue;
+    if (elegido === null || (carga.get(t) ?? 0) < (carga.get(elegido) ?? 0)) elegido = t;
+  }
+  return elegido;
+}
+
+/** Reglas con que parte la demo (también las crea la migración 0003). */
+export const REGLAS_INICIALES: Record<Categoria, Regla> = {
+  red: { modo: "tecnico", tecnico: "Diego Fuentes" },
+  telefonia: { modo: "tecnico", tecnico: "Diego Fuentes" },
+  cuentas: { modo: "tecnico", tecnico: "Camila Rojas" },
+  hardware: { modo: "menos_carga", tecnico: null },
+  impresoras: { modo: "menos_carga", tecnico: null },
+  software: { modo: "cola", tecnico: null },
+  otro: { modo: "cola", tecnico: null },
+};
+
+/** Autor de los eventos que registra el sistema solo. */
+export const AUTOR_SISTEMA = "Asignación automática";
+
 export const esUno =
   <T extends string>(lista: readonly T[]) =>
   (x: unknown): x is T =>

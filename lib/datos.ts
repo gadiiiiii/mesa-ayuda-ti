@@ -1,10 +1,14 @@
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, like, ne, or, sql, type SQL } from "drizzle-orm";
 import type { BD } from "./db";
-import { equipos, eventos, tickets, type Equipo, type Evento, type Ticket } from "./db/esquema";
+import { equipos, eventos, reglasAsignacion, tecnicos, tickets, type Equipo, type Evento, type Ticket } from "./db/esquema";
 import {
   CATEGORIAS,
   ESTADOS_EQUIPO,
+  AUTOR_SISTEMA,
   ESTADOS_PENDIENTES,
+  REGLAS_INICIALES,
+  elegirTecnico,
+  type Regla,
   PREFIJO_TIPO,
   TECNICOS,
   accionPara,
@@ -134,10 +138,12 @@ async function insertarTicket(
     const codigo = nuevoCodigo();
     try {
       return await bd.transaction(async (tx: Transaccion) => {
+        const tecnico = await tecnicoParaNuevo(tx as unknown as BD, datos.categoria);
         const [t] = await tx
           .insert(tickets)
           .values({
             ...datos,
+            tecnico,
             codigo,
             creadoEn: ahora,
             actualizadoEn: ahora,
@@ -145,6 +151,11 @@ async function insertarTicket(
           })
           .returning({ id: tickets.id });
         await tx.insert(eventos).values({ ticketId: t.id, tipo: "creado", autor, publico: true, creadoEn: ahora });
+        if (tecnico) {
+          await tx
+            .insert(eventos)
+            .values({ ticketId: t.id, tipo: "asignacion", autor: AUTOR_SISTEMA, hacia: tecnico, publico: true, creadoEn: ahora });
+        }
         return { id: t.id, codigo };
       });
     } catch (err) {
@@ -210,18 +221,16 @@ export async function cambiarEstado(
         .insert(eventos)
         .values({ ticketId: id, tipo: "asignacion", autor, desde: null, hacia: autor, publico: true, creadoEn: ahora });
     }
-    await tx
-      .insert(eventos)
-      .values({
-        ticketId: id,
-        tipo: "estado",
-        autor,
-        desde: t.estado,
-        hacia,
-        texto: accion.nota ? nota : null,
-        publico: true,
-        creadoEn: ahora,
-      });
+    await tx.insert(eventos).values({
+      ticketId: id,
+      tipo: "estado",
+      autor,
+      desde: t.estado,
+      hacia,
+      texto: accion.nota ? nota : null,
+      publico: true,
+      creadoEn: ahora,
+    });
   });
   return bien(undefined);
 }
@@ -268,6 +277,90 @@ export async function actualizarAsignacion(
     await tx.insert(eventos).values(registro);
   });
   return bien({ cambios: registro.length });
+}
+
+// ── Asignación automática y «Mis tickets» ─────────────────────────────────
+
+export async function obtenerReglas(bd: BD): Promise<Record<Categoria, Regla>> {
+  const filas = await bd.select().from(reglasAsignacion);
+  const r = Object.fromEntries(CATEGORIAS.map((c) => [c, { modo: "cola", tecnico: null } as Regla])) as Record<Categoria, Regla>;
+  for (const f of filas) r[f.categoria] = { modo: f.modo, tecnico: f.tecnico };
+  return r;
+}
+
+/** Técnicos que reciben tickets automáticamente. Si la tabla está vacía, todos. */
+export async function tecnicosDisponibles(bd: BD): Promise<string[]> {
+  const filas = await bd.select().from(tecnicos);
+  if (!filas.length) return [...TECNICOS];
+  return TECNICOS.filter((t) => filas.some((f) => f.nombre === t && f.disponible));
+}
+
+export async function cargaPendiente(bd: BD): Promise<Map<string, number>> {
+  const filas = await bd
+    .select({ tecnico: tickets.tecnico, n: count() })
+    .from(tickets)
+    .where(inArray(tickets.estado, [...ESTADOS_PENDIENTES]))
+    .groupBy(tickets.tecnico);
+  return new Map(filas.filter((f) => f.tecnico).map((f) => [f.tecnico!, Number(f.n)]));
+}
+
+async function tecnicoParaNuevo(bd: BD, categoria: Categoria): Promise<string | null> {
+  const [regla] = await bd.select().from(reglasAsignacion).where(eq(reglasAsignacion.categoria, categoria));
+  if (!regla || regla.modo === "cola") return null;
+  return elegirTecnico(regla, await tecnicosDisponibles(bd), await cargaPendiente(bd));
+}
+
+export async function guardarReglas(bd: BD, reglas: Record<Categoria, Regla>, disponibles: readonly string[]): Promise<void> {
+  await bd.transaction(async (tx) => {
+    for (const c of CATEGORIAS) {
+      const r = reglas[c];
+      const valor = { modo: r.modo, tecnico: r.modo === "tecnico" ? r.tecnico : null };
+      await tx
+        .insert(reglasAsignacion)
+        .values({ categoria: c, ...valor })
+        .onConflictDoUpdate({ target: reglasAsignacion.categoria, set: valor });
+    }
+    for (const t of TECNICOS) {
+      const disponible = disponibles.includes(t);
+      await tx.insert(tecnicos).values({ nombre: t, disponible }).onConflictDoUpdate({ target: tecnicos.nombre, set: { disponible } });
+    }
+  });
+}
+
+/** Deja las reglas y la disponibilidad como al comienzo de la demo. */
+export async function reglasIniciales(bd: BD): Promise<void> {
+  await guardarReglas(bd, REGLAS_INICIALES, TECNICOS);
+}
+
+export interface MisTickets {
+  asignados: FilaTicket[];
+  /** Los que nadie ha tomado, los más urgentes primero. */
+  porTomar: FilaTicket[];
+  /** Lo que resolvió en los últimos 7 días. */
+  resueltos: FilaTicket[];
+}
+
+export async function misTickets(bd: BD, tecnico: string, ahora: Date): Promise<MisTickets> {
+  const [asignados, porTomar, recientes] = await Promise.all([
+    listarTickets(bd, { estado: "pendientes", tecnico }),
+    listarTickets(bd, { estado: "pendientes", tecnico: "sin_asignar" }, 5),
+    bd
+      .select(columnasFila)
+      .from(tickets)
+      .leftJoin(equipos, eq(tickets.equipoId, equipos.id))
+      .where(and(eq(tickets.tecnico, tecnico), gte(tickets.resueltoEn, new Date(ahora.getTime() - 7 * DIA))))
+      .orderBy(desc(tickets.resueltoEn))
+      .limit(10),
+  ]);
+  return { asignados, porTomar, resueltos: recientes };
+}
+
+export async function contarMisPendientes(bd: BD, tecnico: string): Promise<number> {
+  const [r] = await bd
+    .select({ n: count() })
+    .from(tickets)
+    .where(and(eq(tickets.tecnico, tecnico), inArray(tickets.estado, [...ESTADOS_PENDIENTES])));
+  return Number(r?.n ?? 0);
 }
 
 // ── Portal: lo que ve quien pidió ayuda ────────────────────────────────────
@@ -494,5 +587,5 @@ export async function resumen(bd: BD, ahora: Date): Promise<Resumen> {
 
 /** Borra todo (y reinicia los números de ticket). Lo usa el botón de restablecer la demo. */
 export async function vaciar(bd: BD): Promise<void> {
-  await bd.execute(sql`TRUNCATE ${eventos}, ${tickets}, ${equipos} RESTART IDENTITY CASCADE`);
+  await bd.execute(sql`TRUNCATE ${eventos}, ${tickets}, ${equipos}, ${reglasAsignacion}, ${tecnicos} RESTART IDENTITY CASCADE`);
 }

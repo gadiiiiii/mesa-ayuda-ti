@@ -1,5 +1,5 @@
 import { boolean, date, index, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
-import type { Categoria, Estado, EstadoEquipo, Prioridad, TipoEquipo } from "../dominio";
+import type { Categoria, Estado, EstadoEquipo, ModoAsignacion, Prioridad, TipoEquipo } from "../dominio";
 
 const momento = (nombre: string) => timestamp(nombre, { withTimezone: true, mode: "date" });
 
@@ -75,6 +75,20 @@ export const eventos = pgTable(
   },
   (t) => [index("eventos_ticket_idx").on(t.ticketId)],
 );
+
+/** Cómo se asigna un ticket nuevo de cada categoría. */
+export const reglasAsignacion = pgTable("reglas_asignacion", {
+  categoria: text("categoria").$type<Categoria>().primaryKey(),
+  modo: text("modo").$type<ModoAsignacion>().notNull().default("cola"),
+  /** Solo para el modo "tecnico". */
+  tecnico: text("tecnico"),
+});
+
+/** Técnicos que reciben tickets automáticamente (se desmarca a quien está de vacaciones o con licencia). */
+export const tecnicos = pgTable("tecnicos", {
+  nombre: text("nombre").primaryKey(),
+  disponible: boolean("disponible").notNull().default(true),
+});
 
 export type Equipo = typeof equipos.$inferSelect;
 export type Ticket = typeof tickets.$inferSelect;
