@@ -3,7 +3,7 @@ import { sembrarConocimiento } from "./conocimientoSemilla";
 import type { BD } from "./db";
 import { crearProblema, marcarDuplicado, resolverProblema, vincularProblema } from "./relacionados";
 import { aLocal, desdeLocal, habilesEntre, sumarDia, sumarHabiles, ventana } from "./horario";
-import { equipos, eventos, reglasAsignacion, tecnicos, tickets } from "./db/esquema";
+import { encuestas, equipos, eventos, reglasAsignacion, tecnicos, tickets } from "./db/esquema";
 import {
   HORAS_PLAZO,
   PREFIJO_TIPO,
@@ -521,6 +521,35 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
     .values(filas.map((f) => f.ticket))
     .returning({ id: tickets.id });
   await bd.insert(eventos).values(filas.flatMap((f, i) => f.eventos.map((e) => ({ ...e, ticketId: ids[i].id }))));
+
+  // ── Encuestas: la mitad de los resueltos la responde, casi siempre bien ──
+  const COMENTARIOS_ENCUESTA: Record<number, string[]> = {
+    5: ["Muy rápido, gracias.", "Excelente atención, me explicaron todo."],
+    4: ["Bien, aunque tardaron un poco en venir."],
+    3: ["Se resolvió, pero tuve que llamar dos veces."],
+    2: ["Demoró mucho y nadie me avisó en qué iba."],
+    1: ["El problema volvió al día siguiente."],
+  };
+  const respuestasEncuesta = filas
+    .map((f, i) => ({ t: f.ticket, id: ids[i].id }))
+    .filter(({ t }) => t.resueltoEn && az.siguiente() < 0.5)
+    .map(({ t, id }) => {
+      const nota = az.ponderado<number>([
+        [5, 50],
+        [4, 30],
+        [3, 12],
+        [2, 5],
+        [1, 3],
+      ]);
+      const cuando = sumarHabiles(t.resueltoEn!, HORA * (0.5 + az.siguiente() * 4));
+      return {
+        ticketId: id,
+        nota,
+        comentario: az.siguiente() < 0.4 ? az.elegir(COMENTARIOS_ENCUESTA[nota]) : null,
+        creadoEn: cuando > ahora ? ahora : cuando,
+      };
+    });
+  if (respuestasEncuesta.length) await bd.insert(encuestas).values(respuestasEncuesta);
 
   // ── Relacionados: un duplicado, un problema abierto y uno ya resuelto ──
   const conId = filas.map((f, i) => ({ ...f.ticket, id: ids[i].id }));

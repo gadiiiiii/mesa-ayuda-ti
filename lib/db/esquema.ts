@@ -140,9 +140,21 @@ export const respuestas = pgTable("respuestas", {
   texto: text("texto").notNull(),
 });
 
+/** Encuesta de satisfacción: la responde el solicitante en el portal cuando su ticket se resuelve. */
+export const encuestas = pgTable("encuestas", {
+  ticketId: integer("ticket_id")
+    .primaryKey()
+    .references(() => tickets.id, { onDelete: "cascade" }),
+  /** 1 (muy mala) a 5 (muy buena). */
+  nota: integer("nota").notNull(),
+  comentario: text("comentario"),
+  creadoEn: momento("creado_en").notNull().defaultNow(),
+});
+
 export type Equipo = typeof equipos.$inferSelect;
 export type Ticket = typeof tickets.$inferSelect;
 export type Evento = typeof eventos.$inferSelect;
 export type Problema = typeof problemas.$inferSelect;
 export type Articulo = typeof articulos.$inferSelect;
 export type Respuesta = typeof respuestas.$inferSelect;
+export type Encuesta = typeof encuestas.$inferSelect;

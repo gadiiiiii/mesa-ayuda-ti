@@ -92,8 +92,15 @@ export default async function Panel() {
 
   return (
     <>
-      <h1 className="text-3xl font-bold">Panel</h1>
-      <p className="mt-1 text-muted-foreground first-letter:uppercase">{formatearDia(ahora)}</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Panel</h1>
+          <p className="mt-1 text-muted-foreground first-letter:uppercase">{formatearDia(ahora)}</p>
+        </div>
+        <Link href="/metricas" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline">
+          Ver métricas del mes
+        </Link>
+      </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <Cifra etiqueta="Pendientes" valor={String(r.pendientes)} href="/tickets" />

@@ -12,12 +12,14 @@ import {
   crearSolicitud,
   crearTicket,
   guardarReglas,
+  obtenerSeguimiento,
   responderSolicitante,
   vaciar,
 } from "@/lib/datos";
 import { obtenerBD } from "@/lib/db";
 import { CATEGORIAS, MODOS_ASIGNACION, esTecnico, type Categoria, type ModoAsignacion, type Regla } from "@/lib/dominio";
 import { normalizarCodigo } from "@/lib/codigo";
+import { responderEncuesta } from "@/lib/metricas";
 import {
   actualizarArticulo,
   crearArticulo,
@@ -315,4 +317,24 @@ export async function accionEliminarRespuesta(form: FormData) {
   const id = idDe(form);
   if (id) await eliminarRespuesta(await obtenerBD(), id);
   revalidatePath("/", "layout");
+}
+
+// ── Encuesta ───────────────────────────────────────────────────────────────
+
+export async function accionResponderEncuesta(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const codigo = normalizarCodigo(String(form.get("codigo") ?? ""));
+  const nota = Number(form.get("nota"));
+  const comentario =
+    String(form.get("comentario") ?? "")
+      .trim()
+      .slice(0, 1000) || null;
+  if (!codigo) return { mensaje: "Datos no válidos. Recarga la página." };
+  if (!nota) return { errores: { nota: "Elige una nota del 1 al 5." }, valores: valores(form) };
+  const bd = await obtenerBD();
+  const s = await obtenerSeguimiento(bd, codigo);
+  if (!s) return { mensaje: "No encontramos esa solicitud." };
+  const r = await responderEncuesta(bd, s.ticket.id, nota, comentario, new Date());
+  if (!r.ok) return { mensaje: r.error };
+  revalidatePath("/", "layout");
+  return { ok: Date.now(), mensaje: "¡Gracias por responder!" };
 }

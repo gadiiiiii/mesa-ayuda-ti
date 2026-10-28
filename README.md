@@ -71,6 +71,12 @@ Los problemas abiertos aparecen en el panel.
 - En cada ticket se sugieren artículos parecidos, y los públicos se **envían al solicitante** con un clic. Un ticket resuelto se puede convertir en artículo, partiendo de su descripción y su solución.
 - **Respuestas predefinidas** para comentar más rápido, con `{solicitante}`, `{tecnico}` y `{folio}` que se completan solos.
 
+### Métricas y encuesta de satisfacción
+
+- Cuando un ticket se resuelve, el solicitante responde en el portal **¿Cómo te atendimos?** del 1 al 5, con un comentario opcional. El técnico ve la respuesta en la ficha.
+- La página **Métricas** (últimos 30 o 90 días) muestra recibidos y resueltos, porcentaje dentro del plazo, tiempo promedio de **primera respuesta** y de **resolución** en horas hábiles (sin contar el tiempo en espera) y la satisfacción promedio. Hay un gráfico por semana, tablas por categoría y por técnico, y los últimos comentarios de la encuesta.
+- **Exportar a Excel:** descarga los tickets del período en CSV separado por punto y coma, con decimales con coma y tildes correctas, como lo espera Excel en Chile.
+
 ### Inventario
 
 Equipos con código de inventario correlativo por tipo (`NB-0007`, `IMP-0012`, `SW-0002`…), marca, modelo, serie, unidad, responsable, estado (en uso, en bodega, en reparación, de baja), IP y MAC. La IP y la MAC se validan y se normalizan: la MAC se acepta con dos puntos, guiones o en formato Cisco (`001a.2b3c.4d5e`). La ficha de cada equipo muestra todos sus tickets y permite crear uno nuevo ya asociado.
@@ -102,6 +108,7 @@ Arriba a la derecha se elige **como qué técnico actúas** (se guarda en una co
   - [`lib/datos.ts`](lib/datos.ts): consultas y cambios en la base, cada cambio de estado en una transacción junto a su registro en el historial.
   - [`lib/relacionados.ts`](lib/relacionados.ts): duplicados y problemas.
   - [`lib/conocimiento.ts`](lib/conocimiento.ts): búsqueda de artículos y respuestas predefinidas.
+  - [`lib/metricas.ts`](lib/metricas.ts): cálculo de métricas, encuesta y exportación a CSV.
   - [`lib/semilla.ts`](lib/semilla.ts): datos de ejemplo reproducibles, con fechas relativas a hoy.
 - **Tests con [Vitest](https://vitest.dev)**, contra un Postgres real en memoria (PGlite): ciclo de vida completo de un ticket, cambios no permitidos, filtros y búsqueda, códigos de inventario y datos de ejemplo. El calendario hábil se prueba con viernes, fines de semana, Navidad, cambio de horario y la ida y vuelta entre sumar y medir tiempo hábil.
 - GitHub Actions corre los tests y el build en cada push.
@@ -131,7 +138,7 @@ Para cambiar el esquema: edita `lib/db/esquema.ts` y genera la migración con `n
 - [x] «Mis tickets» y asignación automática por categoría, carga y disponibilidad.
 - [x] Tickets relacionados: duplicados y problemas que agrupan varios tickets y se resuelven juntos.
 - [x] Base de conocimiento con búsqueda en español, sugerencias en el portal y respuestas predefinidas.
-- [ ] Métricas de tiempos y encuesta de satisfacción.
+- [x] Métricas de tiempos, encuesta de satisfacción y exportación a Excel.
 - [ ] Inventario con garantía, historial de cambios y mantenciones.
 - [ ] Inicio de sesión con roles (quien pide ayuda y técnico).
 - [ ] Avisos por correo al solicitante cuando su ticket se resuelve.

@@ -17,6 +17,7 @@ import Relacionados from "./Relacionados";
 import ArticulosSugeridos from "./ArticulosSugeridos";
 import { aplicarPlantilla, buscarArticulos, listarRespuestas } from "@/lib/conocimiento";
 import { tecnicoActual } from "@/app/sesion";
+import { obtenerEncuesta } from "@/lib/metricas";
 import { duplicadosDe, listarProblemas, obtenerProblema } from "@/lib/relacionados";
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<Parametros> };
@@ -37,13 +38,14 @@ export default async function PaginaTicket({ params, searchParams }: Props) {
   if (!d) notFound();
   const { ticket: t, equipo, eventos } = d;
   const bd = await obtenerBD();
-  const [duplicados, problema, abiertos, sugeridos, plantillas, tecnico] = await Promise.all([
+  const [duplicados, problema, abiertos, sugeridos, plantillas, tecnico, encuesta] = await Promise.all([
     duplicadosDe(bd, t.id),
     t.problemaId ? obtenerProblema(bd, t.problemaId) : null,
     listarProblemas(bd, true),
     buscarArticulos(bd, { q: t.titulo, categoria: t.categoria }, 3),
     listarRespuestas(bd),
     tecnicoActual(),
+    obtenerEncuesta(bd, t.id),
   ]);
   const respuestas = plantillas.map((r) => ({
     titulo: r.titulo,
@@ -150,6 +152,15 @@ export default async function PaginaTicket({ params, searchParams }: Props) {
               Datos
             </h2>
             <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              {encuesta && (
+                <>
+                  <dt className="text-muted-foreground">Encuesta</dt>
+                  <dd>
+                    <strong>{encuesta.nota} de 5</strong>
+                    {encuesta.comentario && <span className="block text-muted-foreground">«{encuesta.comentario}»</span>}
+                  </dd>
+                </>
+              )}
               <dt className="text-muted-foreground">Llegó por</dt>
               <dd>{t.origen === "portal" ? "Portal de solicitudes" : "Mesa de ayuda"}</dd>
               {t.codigo && (

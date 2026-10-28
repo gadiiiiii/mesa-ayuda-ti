@@ -43,6 +43,13 @@
       "when": 1793202443780,
       "tag": "0005_conocimiento",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793202979501,
+      "tag": "0006_encuestas",
+      "breakpoints": true
     }
   ]
 }

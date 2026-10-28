@@ -2,6 +2,7 @@ import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, like, ne, or, s
 import type { BD } from "./db";
 import {
   articulos,
+  encuestas,
   equipos,
   eventos,
   problemas,
@@ -605,6 +606,6 @@ export async function resumen(bd: BD, ahora: Date): Promise<Resumen> {
 /** Borra todo (y reinicia los números de ticket). Lo usa el botón de restablecer la demo. */
 export async function vaciar(bd: BD): Promise<void> {
   await bd.execute(
-    sql`TRUNCATE ${eventos}, ${tickets}, ${equipos}, ${reglasAsignacion}, ${tecnicos}, ${problemas}, ${articulos}, ${respuestas} RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE ${eventos}, ${tickets}, ${equipos}, ${reglasAsignacion}, ${tecnicos}, ${problemas}, ${articulos}, ${respuestas}, ${encuestas} RESTART IDENTITY CASCADE`,
   );
 }

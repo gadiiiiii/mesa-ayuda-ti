@@ -10,6 +10,8 @@ import { EstadoTicket, EtiquetaInventario } from "@/app/_componentes/Insignias";
 import { texto, type Parametros } from "@/app/_componentes/parametros";
 import HistorialPortal from "./HistorialPortal";
 import Responder from "./Responder";
+import Encuesta from "./Encuesta";
+import { obtenerEncuesta } from "@/lib/metricas";
 
 type Props = { params: Promise<{ codigo: string }>; searchParams: Promise<Parametros> };
 
@@ -27,6 +29,7 @@ export default async function SeguimientoPage({ params, searchParams }: Props) {
   const s = await cargar((await params).codigo);
   if (!s) notFound();
   const { ticket: t, eventos } = s;
+  const encuesta = t.resueltoEn ? await obtenerEncuesta(await obtenerBD(), t.id) : null;
   const nueva = texto(await searchParams, "nueva") === "1";
   const ahora = new Date();
 
@@ -97,6 +100,15 @@ export default async function SeguimientoPage({ params, searchParams }: Props) {
         </h2>
         <HistorialPortal eventos={eventos} solicitante={t.solicitante} ahora={ahora} />
       </section>
+
+      {t.resueltoEn &&
+        (encuesta ? (
+          <p role="status" className="mt-8 rounded-lg border border-border bg-card p-5">
+            Calificaste la atención con <strong>{encuesta.nota} de 5</strong>. ¡Gracias!
+          </p>
+        ) : (
+          <Encuesta codigo={t.codigo!} />
+        ))}
 
       {t.estado !== "cerrado" && <Responder codigo={t.codigo!} resuelto={t.estado === "resuelto"} />}
     </div>
