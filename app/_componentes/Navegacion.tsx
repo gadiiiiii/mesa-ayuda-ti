@@ -8,6 +8,7 @@ const ENLACES = [
   { href: "/", texto: "Panel", activo: (p: string) => p === "/" },
   { href: "/tickets", texto: "Tickets", activo: (p: string) => p.startsWith("/tickets") },
   { href: "/inventario", texto: "Inventario", activo: (p: string) => p.startsWith("/inventario") },
+  { href: "/portal", texto: "Portal", activo: (p: string) => p.startsWith("/portal") },
 ];
 
 export default function Navegacion({ className }: { className?: string }) {

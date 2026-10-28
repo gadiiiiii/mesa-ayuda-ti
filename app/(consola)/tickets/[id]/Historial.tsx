@@ -3,13 +3,21 @@ import type { Evento } from "@/lib/db/esquema";
 import { NOMBRE_ESTADO, NOMBRE_PRIORIDAD, type Estado, type Prioridad } from "@/lib/dominio";
 import { formatearFechaHora, hace } from "@/lib/formato";
 
-function describir(e: Evento): { texto: React.ReactNode; nota?: string; etiquetaNota?: string } {
+interface Contexto {
+  solicitante: string;
+  origen: "mesa" | "portal";
+}
+
+function describir(e: Evento, c: Contexto): { texto: React.ReactNode; nota?: string; etiquetaNota?: string; interna?: boolean } {
   const quien = <strong className="font-semibold">{e.autor}</strong>;
+  const delSolicitante = e.autor === c.solicitante;
   switch (e.tipo) {
     case "creado":
-      return { texto: <>{quien} registró el ticket</> };
+      return { texto: c.origen === "portal" ? <>{quien} pidió ayuda desde el portal</> : <>{quien} registró el ticket</> };
     case "comentario":
-      return { texto: <>{quien} comentó</>, nota: e.texto ?? "" };
+      if (!e.publico)
+        return { texto: <>{quien} dejó una nota interna</>, nota: e.texto ?? "", etiquetaNota: "No la ve el solicitante", interna: true };
+      return { texto: delSolicitante ? <>{quien} escribió desde el portal</> : <>{quien} respondió al solicitante</>, nota: e.texto ?? "" };
     case "asignacion":
       if (!e.hacia) return { texto: <>{quien} dejó el ticket sin asignar</> };
       if (e.hacia === e.autor) return { texto: <>{quien} se asignó el ticket</> };
@@ -45,7 +53,8 @@ function describir(e: Evento): { texto: React.ReactNode; nota?: string; etiqueta
       if (hacia === "resuelto") return { texto: <>{quien} lo resolvió</>, nota, etiquetaNota: "Solución" };
       if (hacia === "cerrado") return { texto: <>{quien} lo cerró</>, nota, etiquetaNota: "Motivo" };
       if (hacia === "abierto" && desde === "en_curso") return { texto: <>{quien} lo devolvió a la cola</> };
-      if (hacia === "abierto") return { texto: <>{quien} lo reabrió</>, nota, etiquetaNota: "Motivo" };
+      if (hacia === "abierto")
+        return { texto: delSolicitante ? <>{quien} lo reabrió desde el portal</> : <>{quien} lo reabrió</>, nota, etiquetaNota: "Motivo" };
       return {
         texto: (
           <>
@@ -65,11 +74,11 @@ const ICONO = {
   prioridad: SignalIcon,
 };
 
-export default function Historial({ eventos, ahora }: { eventos: Evento[]; ahora: Date }) {
+export default function Historial({ eventos, ahora, ...contexto }: { eventos: Evento[]; ahora: Date } & Contexto) {
   return (
     <ol className="mt-3 flex flex-col">
       {eventos.map((e) => {
-        const d = describir(e);
+        const d = describir(e, contexto);
         const Icono = ICONO[e.tipo];
         const resuelto = e.tipo === "estado" && e.hacia === "resuelto";
         return (
@@ -91,9 +100,11 @@ export default function Historial({ eventos, ahora }: { eventos: Evento[]; ahora
               </p>
               {d.nota && (
                 <div
-                  className={`mt-2 max-w-[70ch] rounded-md border px-3 py-2 ${resuelto ? "border-success/40 bg-success-soft" : "border-border bg-card"}`}
+                  className={`mt-2 max-w-[70ch] rounded-md border px-3 py-2 ${resuelto ? "border-success/40 bg-success-soft" : d.interna ? "border-dashed border-muted-foreground/40 bg-muted/60" : "border-border bg-card"}`}
                 >
-                  {d.etiquetaNota && <p className="text-sm font-semibold">{d.etiquetaNota}</p>}
+                  {d.etiquetaNota && (
+                    <p className={`text-sm font-semibold ${d.interna ? "text-muted-foreground" : ""}`}>{d.etiquetaNota}</p>
+                  )}
                   <p className="whitespace-pre-line">{d.nota}</p>
                 </div>
               )}

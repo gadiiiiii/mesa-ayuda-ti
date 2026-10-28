@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SelectNativo } from "@/components/ui/input";
 import { NOMBRE_PRIORIDAD, PRIORIDADES, TECNICOS, type Prioridad } from "@/lib/dominio";
-import { accionAsignar, type EstadoFormulario } from "../../acciones";
-import { AvisoError } from "../../_componentes/Campo";
+import { accionAsignar, type EstadoFormulario } from "@/app/acciones";
+import { AvisoError } from "@/app/_componentes/Campo";
 
 export default function Asignacion({ id, tecnico, prioridad }: { id: number; tecnico: string | null; prioridad: Prioridad }) {
   const [estado, enviar, enviando] = useActionState<EstadoFormulario, FormData>(accionAsignar, {});

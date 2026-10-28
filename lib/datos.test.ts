@@ -5,17 +5,20 @@ import {
   cambiarEstado,
   comentar,
   crearEquipo,
+  crearSolicitud,
   crearTicket,
   listarEquipos,
   listarTickets,
   obtenerEquipo,
+  obtenerSeguimiento,
   obtenerTicket,
+  responderSolicitante,
   resumen,
   vaciar,
 } from "./datos";
 import { plazo } from "./dominio";
 import { sembrar } from "./semilla";
-import { esquemaEquipo, esquemaTicketNuevo } from "./validacion";
+import { esquemaEquipo, esquemaSolicitud, esquemaTicketNuevo } from "./validacion";
 
 const H = 3_600_000;
 // Miércoles 28 de octubre de 2026, 9:00 en Chile.
@@ -162,6 +165,67 @@ describe("inventario", () => {
       ok: false,
       error: "El equipo elegido ya no existe.",
     });
+  });
+});
+
+describe("portal de solicitudes", () => {
+  const solicitud = (extra: Record<string, string> = {}) =>
+    esquemaSolicitud.parse({
+      solicitante: "Ana Pérez",
+      unidad: "Tránsito",
+      categoria: "impresoras",
+      prioridad: "alta",
+      titulo: "La impresora no imprime",
+      descripcion: "Los documentos quedan en la cola desde la mañana.",
+      ...extra,
+    });
+
+  it("crea el ticket con código de seguimiento y asocia el equipo por su etiqueta", async () => {
+    const e = await crearEquipo(bd, nuevoEquipo(), t0);
+    expect(e.ok).toBe(true);
+    const r = await crearSolicitud(bd, solicitud({ codigoEquipo: "imp-1" }), t0);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.valor.codigo).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    const d = (await obtenerTicket(bd, r.valor.id))!;
+    expect(d.ticket).toMatchObject({ origen: "portal", codigo: r.valor.codigo, prioridad: "alta" });
+    expect(d.equipo?.codigo).toBe("IMP-0001");
+    expect(d.eventos[0]).toMatchObject({ tipo: "creado", autor: "Ana Pérez", publico: true });
+  });
+
+  it("avisa si el código del equipo no existe", async () => {
+    const r = await crearSolicitud(bd, solicitud({ codigoEquipo: "NB-0999" }), t0);
+    expect(r).toEqual({ ok: false, error: "No encontramos un equipo con el código NB-0999. Revisa la etiqueta o deja el campo vacío." });
+  });
+
+  it("el seguimiento no muestra notas internas ni cambios de prioridad", async () => {
+    const r = await crearSolicitud(bd, solicitud(), t0);
+    if (!r.ok) throw new Error(r.error);
+    const { id, codigo } = r.valor;
+    await cambiarEstado(bd, id, "en_curso", null, "Diego Fuentes", despues(1));
+    await comentar(bd, id, "El tóner es genérico, ojo.", "Diego Fuentes", despues(1.5));
+    await comentar(bd, id, "Paso a revisarla a las 11.", "Diego Fuentes", despues(1.6), true);
+    await actualizarAsignacion(bd, id, { tecnico: "Diego Fuentes", prioridad: "media" }, "Diego Fuentes", despues(2));
+    const seg = (await obtenerSeguimiento(bd, codigo))!;
+    expect(seg.eventos.map((e) => e.texto ?? e.tipo)).toEqual(["creado", "asignacion", "estado", "Paso a revisarla a las 11."]);
+    expect(await obtenerSeguimiento(bd, "ZZZZ-ZZZZ")).toBeNull();
+  });
+
+  it("el solicitante puede reabrir una solicitud resuelta, pero no una cerrada", async () => {
+    const r = await crearSolicitud(bd, solicitud(), t0);
+    if (!r.ok) throw new Error(r.error);
+    const { id, codigo } = r.valor;
+    await cambiarEstado(bd, id, "resuelto", "Se cambió el tóner.", "Diego Fuentes", despues(1));
+    expect(await responderSolicitante(bd, codigo, "Sigue saliendo borroso.", true, despues(2))).toEqual({
+      ok: true,
+      valor: { reabierto: true },
+    });
+    const d = (await obtenerTicket(bd, id))!;
+    expect(d.ticket.estado).toBe("abierto");
+    expect(d.eventos.at(-1)).toMatchObject({ tipo: "estado", autor: "Ana Pérez", hacia: "abierto", texto: "Sigue saliendo borroso." });
+
+    await cambiarEstado(bd, id, "cerrado", "Duplicado.", "Diego Fuentes", despues(3));
+    expect((await responderSolicitante(bd, codigo, "Hola", false, despues(4))).ok).toBe(false);
   });
 });
 

@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { ACCIONES, NOMBRE_ESTADO, type Accion, type Estado } from "@/lib/dominio";
-import { accionCambiarEstado, type EstadoFormulario } from "../../acciones";
-import { AvisoError } from "../../_componentes/Campo";
+import { accionCambiarEstado, type EstadoFormulario } from "@/app/acciones";
+import { AvisoError } from "@/app/_componentes/Campo";
 
 /** Botones para mover el ticket de estado. Los que necesitan una nota la piden antes de confirmar. */
 export default function AccionesEstado({ id, estado }: { id: number; estado: Estado }) {

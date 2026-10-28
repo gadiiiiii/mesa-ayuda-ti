@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { listarTickets, type FiltrosTickets } from "@/lib/datos";
 import { obtenerBD } from "@/lib/db";
 import { CATEGORIAS, ESTADOS, NOMBRE_CATEGORIA, NOMBRE_ESTADO, NOMBRE_PRIORIDAD, PRIORIDADES, TECNICOS } from "@/lib/dominio";
-import Filtros from "../_componentes/Filtros";
-import TablaTickets from "../_componentes/TablaTickets";
-import { opcion, texto, type Parametros } from "../_componentes/parametros";
+import Filtros from "@/app/_componentes/Filtros";
+import TablaTickets from "@/app/_componentes/TablaTickets";
+import { opcion, texto, type Parametros } from "@/app/_componentes/parametros";
 
 export const metadata: Metadata = { title: "Tickets" };
 

@@ -63,4 +63,6 @@ Pesos: 400, 500, 600 y 700. Títulos en 700 con interletrado −0,01 em. Sin may
 - **Folio:** `#` + número en mono, apagado junto al título.
 - **Tablas:** encabezado en `sm` 600 color secundario, filas de al menos 56 px y toda la fila es un enlace. En el celular se apilan como tarjetas.
 - **Formularios:** etiqueta encima, ayuda debajo en `muted-foreground`, error en `destructive` con ícono. Los selects son nativos para que funcionen bien en el celular.
+- **Portal:** la misma identidad con una cabecera simple (sin la navegación de los técnicos) y un ancho de 60 rem. El lenguaje es para quien pide ayuda: segunda persona («Enviaste la solicitud», «Te respondió»), estados explicados en una frase y nada de jerga (impacto en vez de prioridad).
+- **Notas internas:** caja con borde punteado y fondo `muted`, con la etiqueta «No la ve el solicitante». Las respuestas públicas usan la caja normal.
 - **Gráficos del panel:** barras horizontales de un solo tono (`primary`) con el número escrito al lado; nunca solo color.

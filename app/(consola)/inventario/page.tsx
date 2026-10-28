@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { listarEquipos, type FiltrosEquipos } from "@/lib/datos";
 import { obtenerBD } from "@/lib/db";
 import { ESTADOS_EQUIPO, NOMBRE_ESTADO_EQUIPO, NOMBRE_TIPO, TIPOS_EQUIPO, UNIDADES } from "@/lib/dominio";
-import Filtros from "../_componentes/Filtros";
-import { EstadoEquipoTexto, EtiquetaInventario } from "../_componentes/Insignias";
-import { opcion, texto, type Parametros } from "../_componentes/parametros";
+import Filtros from "@/app/_componentes/Filtros";
+import { EstadoEquipoTexto, EtiquetaInventario } from "@/app/_componentes/Insignias";
+import { opcion, texto, type Parametros } from "@/app/_componentes/parametros";
 
 export const metadata: Metadata = { title: "Inventario" };
 

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import FormularioEquipo from "../FormularioEquipo";
+import FormularioEquipo from "@/app/(consola)/inventario/FormularioEquipo";
 
 export const metadata: Metadata = { title: "Agregar equipo" };
 

@@ -39,6 +39,16 @@ Abierto ──Tomar──▶ En curso ──Resolver──▶ Resuelto ──Cer
 
 Resolver pide la solución, poner en espera pide qué se espera, y cerrar sin resolver o reabrir piden el motivo. Quien toma un ticket sin técnico queda asignado. Todo queda en el **historial** del ticket, con autor y hora, junto a los comentarios.
 
+### Portal de solicitudes
+
+En [`/portal`](https://mesa-ayuda-ti.vercel.app/portal) cualquier funcionario pide ayuda sin cuenta: su nombre, su unidad, qué pasa y **cuánto le afecta** (no elige la prioridad: la prioridad sale del impacto, como en ITIL, y el técnico la puede ajustar). Si el problema es de un equipo, escribe el código de su etiqueta (`NB-0007`).
+
+Al enviar recibe un **código de seguimiento** (`ABCD-2345`, sin letras ni números que se confundan) para ver en qué va su solicitud: estado explicado en palabras simples, técnico a cargo, plazo comprometido e historial. Puede agregar información y, si el ticket estaba resuelto pero el problema sigue, reabrirlo.
+
+Los técnicos eligen en cada comentario si es una **nota interna** o una **respuesta que ve el solicitante**; el portal nunca muestra notas internas ni cambios de prioridad.
+
+<img src="docs/seguimiento.png" alt="Seguimiento de una solicitud en el portal, con la respuesta del técnico y la solución" width="64%">
+
 ### Inventario
 
 Equipos con código de inventario correlativo por tipo (`NB-0007`, `IMP-0012`, `SW-0002`…), marca, modelo, serie, unidad, responsable, estado (en uso, en bodega, en reparación, de baja), IP y MAC. La IP y la MAC se validan y se normalizan: la MAC se acepta con dos puntos, guiones o en formato Cisco (`001a.2b3c.4d5e`). La ficha de cada equipo muestra todos sus tickets y permite crear uno nuevo ya asociado.
@@ -93,7 +103,7 @@ Para cambiar el esquema: edita `lib/db/esquema.ts` y genera la migración con `n
 
 - [x] Tickets con plazos, historial y asignación; inventario; panel; demo pública con datos de ejemplo.
 - [x] Plazos en horas hábiles, con feriados y pausa mientras el ticket está en espera.
-- [ ] Portal para que cualquier funcionario pida ayuda y siga su ticket por folio.
+- [x] Portal para que cualquier funcionario pida ayuda y siga su ticket con un código.
 - [ ] «Mis tickets» y asignación automática.
 - [ ] Tickets relacionados: duplicados y problemas que agrupan varios tickets.
 - [ ] Base de conocimiento y respuestas predefinidas.

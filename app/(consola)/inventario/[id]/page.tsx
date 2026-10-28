@@ -7,9 +7,9 @@ import { obtenerEquipo } from "@/lib/datos";
 import { obtenerBD } from "@/lib/db";
 import { NOMBRE_TIPO, estaPendiente } from "@/lib/dominio";
 import { formatearFecha } from "@/lib/formato";
-import { EstadoEquipoTexto, EtiquetaInventario } from "../../_componentes/Insignias";
-import TablaTickets from "../../_componentes/TablaTickets";
-import { texto, type Parametros } from "../../_componentes/parametros";
+import { EstadoEquipoTexto, EtiquetaInventario } from "@/app/_componentes/Insignias";
+import TablaTickets from "@/app/_componentes/TablaTickets";
+import { texto, type Parametros } from "@/app/_componentes/parametros";
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<Parametros> };
 

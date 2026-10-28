@@ -3,9 +3,20 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { actualizarAsignacion, actualizarEquipo, cambiarEstado, comentar, crearEquipo, crearTicket, vaciar } from "@/lib/datos";
+import {
+  actualizarAsignacion,
+  actualizarEquipo,
+  cambiarEstado,
+  comentar,
+  crearEquipo,
+  crearSolicitud,
+  crearTicket,
+  responderSolicitante,
+  vaciar,
+} from "@/lib/datos";
 import { obtenerBD } from "@/lib/db";
 import { esTecnico } from "@/lib/dominio";
+import { normalizarCodigo } from "@/lib/codigo";
 import { sembrar } from "@/lib/semilla";
 import {
   erroresPorCampo,
@@ -13,6 +24,7 @@ import {
   esquemaCambioEstado,
   esquemaComentario,
   esquemaEquipo,
+  esquemaSolicitud,
   esquemaTicketNuevo,
   valores,
 } from "@/lib/validacion";
@@ -67,7 +79,7 @@ export async function accionComentar(_: EstadoFormulario, form: FormData): Promi
   const v = esquemaComentario.safeParse(valores(form));
   if (!id) return { mensaje: "Datos no válidos. Recarga la página." };
   if (!v.success) return { errores: erroresPorCampo(v.error), valores: valores(form) };
-  const r = await comentar(await obtenerBD(), id, v.data.texto, await tecnicoActual(), new Date());
+  const r = await comentar(await obtenerBD(), id, v.data.texto, await tecnicoActual(), new Date(), v.data.publico);
   if (!r.ok) return { mensaje: r.error };
   revalidatePath("/", "layout");
   return { ok: Date.now() };
@@ -111,4 +123,27 @@ export async function accionRestablecer(): Promise<EstadoFormulario> {
   await sembrar(bd, new Date());
   revalidatePath("/", "layout");
   return { ok: Date.now(), mensaje: "Se restablecieron los datos de ejemplo." };
+}
+
+// ── Portal ─────────────────────────────────────────────────────────────────
+
+export async function accionCrearSolicitud(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const datos = valores(form);
+  const v = esquemaSolicitud.safeParse(datos);
+  if (!v.success) return { errores: erroresPorCampo(v.error), valores: datos, mensaje: "Revisa los campos marcados.", intento: Date.now() };
+  const r = await crearSolicitud(await obtenerBD(), v.data, new Date());
+  if (!r.ok) return { errores: { codigoEquipo: r.error }, valores: datos, mensaje: "Revisa los campos marcados.", intento: Date.now() };
+  revalidatePath("/", "layout");
+  redirect(`/portal/seguimiento/${r.valor.codigo}?nueva=1`);
+}
+
+export async function accionResponderSolicitante(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const codigo = normalizarCodigo(String(form.get("codigo") ?? ""));
+  const v = esquemaComentario.safeParse(valores(form));
+  if (!codigo) return { mensaje: "Datos no válidos. Recarga la página." };
+  if (!v.success) return { errores: { texto: erroresPorCampo(v.error).texto }, valores: valores(form) };
+  const r = await responderSolicitante(await obtenerBD(), codigo, v.data.texto, form.get("reabrir") === "on", new Date());
+  if (!r.ok) return { mensaje: r.error, valores: valores(form) };
+  revalidatePath("/", "layout");
+  return { ok: Date.now(), mensaje: r.valor.reabierto ? "Reabrimos tu solicitud." : "Mensaje enviado." };
 }

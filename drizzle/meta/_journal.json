@@ -15,6 +15,13 @@
       "when": 1793200799919,
       "tag": "0001_plazo_habil",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793201129895,
+      "tag": "0002_portal",
+      "breakpoints": true
     }
   ]
 }

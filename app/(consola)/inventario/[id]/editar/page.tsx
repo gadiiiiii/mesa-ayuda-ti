@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { obtenerEquipo } from "@/lib/datos";
 import { obtenerBD } from "@/lib/db";
-import { EtiquetaInventario } from "../../../_componentes/Insignias";
-import FormularioEquipo from "../../FormularioEquipo";
+import { EtiquetaInventario } from "@/app/_componentes/Insignias";
+import FormularioEquipo from "@/app/(consola)/inventario/FormularioEquipo";
 
 export const metadata: Metadata = { title: "Editar equipo" };
 

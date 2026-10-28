@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { tecnicoActual } from "../sesion";
+import { tecnicoActual } from "@/app/sesion";
 import Navegacion from "./Navegacion";
 import SelectorTecnico from "./SelectorTecnico";
 

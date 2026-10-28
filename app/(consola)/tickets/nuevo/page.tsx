@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { equiposParaElegir } from "@/lib/datos";
 import { obtenerBD } from "@/lib/db";
-import { texto, type Parametros } from "../../_componentes/parametros";
+import { texto, type Parametros } from "@/app/_componentes/parametros";
 import FormularioTicket from "./FormularioTicket";
 
 export const metadata: Metadata = { title: "Nuevo ticket" };

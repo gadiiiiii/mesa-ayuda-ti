@@ -86,6 +86,30 @@ export const DESCRIPCION_PRIORIDAD: Record<Prioridad, string> = {
   baja: "Consultas, instalaciones y mejoras. Plazo: 40 horas hábiles, cerca de una semana.",
 };
 
+/**
+ * En el portal, quien pide ayuda no elige la prioridad: dice cuánto le afecta (el impacto, en ITIL)
+ * y de ahí sale la prioridad inicial. El técnico la puede ajustar.
+ */
+export const IMPACTOS: readonly { prioridad: Prioridad; texto: string }[] = [
+  { prioridad: "urgente", texto: "Está detenida la atención de público o toda mi unidad" },
+  { prioridad: "alta", texto: "No puedo trabajar" },
+  { prioridad: "media", texto: "Puedo trabajar, pero con dificultad" },
+  { prioridad: "baja", texto: "Es una consulta, una instalación o un pedido" },
+];
+
+/** Cómo se le explica cada estado a quien pidió ayuda. */
+export const ESTADO_PARA_SOLICITANTE: Record<Estado, string> = {
+  abierto: "Recibida. Pronto la toma un técnico.",
+  en_curso: "Un técnico está trabajando en ella.",
+  en_espera: "En espera de algo para poder seguir (el detalle está en el historial).",
+  resuelto: "Resuelta. Si el problema sigue, escríbenos más abajo.",
+  cerrado: "Cerrada.",
+};
+
+/** Eventos que el solicitante ve en el portal sin que nadie los marque: la creación, los cambios de estado y quién lo atiende. */
+export const EVENTOS_PUBLICOS = ["creado", "estado", "asignacion"] as const;
+export const esEventoPublico = (tipo: string) => (EVENTOS_PUBLICOS as readonly string[]).includes(tipo);
+
 export const CATEGORIAS = ["hardware", "software", "red", "impresoras", "cuentas", "telefonia", "otro"] as const;
 export type Categoria = (typeof CATEGORIAS)[number];
 

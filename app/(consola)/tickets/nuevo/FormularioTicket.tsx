@@ -14,8 +14,8 @@ import {
   type TipoEquipo,
 } from "@/lib/dominio";
 import { cn } from "@/lib/utils";
-import { accionCrearTicket, type EstadoFormulario } from "../../acciones";
-import Campo, { AvisoError } from "../../_componentes/Campo";
+import { accionCrearTicket, type EstadoFormulario } from "@/app/acciones";
+import Campo, { AvisoError } from "@/app/_componentes/Campo";
 
 interface EquipoOpcion {
   id: number;

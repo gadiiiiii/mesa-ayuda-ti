@@ -14,8 +14,8 @@ import {
   UNIDADES,
   type TipoEquipo,
 } from "@/lib/dominio";
-import { accionGuardarEquipo, type EstadoFormulario } from "../acciones";
-import Campo, { AvisoError } from "../_componentes/Campo";
+import { accionGuardarEquipo, type EstadoFormulario } from "@/app/acciones";
+import Campo, { AvisoError } from "@/app/_componentes/Campo";
 
 /** Alta y edición de un equipo. Al editar, el tipo queda fijo porque el código depende de él. */
 export default function FormularioEquipo({ id, codigo, inicial }: { id?: number; codigo?: string; inicial: Record<string, string> }) {

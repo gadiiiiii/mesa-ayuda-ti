@@ -4,7 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { RotateCcwIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { accionRestablecer, type EstadoFormulario } from "../acciones";
+import { accionRestablecer, type EstadoFormulario } from "@/app/acciones";
 
 /** Esta es una demo pública: cualquiera puede volver a los datos de ejemplo. Pide confirmación en dos pasos. */
 export default function Restablecer() {

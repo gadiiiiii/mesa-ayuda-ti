@@ -4,8 +4,8 @@ import { obtenerBD } from "@/lib/db";
 import { NOMBRE_CATEGORIA, NOMBRE_ESTADO_EQUIPO } from "@/lib/dominio";
 import { formatearDia } from "@/lib/formato";
 import { cn } from "@/lib/utils";
-import TablaTickets from "./_componentes/TablaTickets";
-import Restablecer from "./_componentes/Restablecer";
+import TablaTickets from "@/app/_componentes/TablaTickets";
+import Restablecer from "@/app/_componentes/Restablecer";
 
 function Cifra({
   etiqueta,

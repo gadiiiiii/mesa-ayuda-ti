@@ -36,7 +36,34 @@ export const esquemaCambioEstado = z.object({
 
 export const esquemaComentario = z.object({
   texto: obligatorio("el comentario", 2, 4000),
+  /** "on" si es una respuesta que ve el solicitante; si no, es una nota interna. */
+  publico: z
+    .string()
+    .optional()
+    .transform((s) => s === "on" || s === "true"),
 });
+
+/** Lo que llena un funcionario en el portal. La prioridad sale del impacto. */
+export const esquemaSolicitud = z.object({
+  solicitante: obligatorio("tu nombre", 3, 80),
+  unidad: opcion(UNIDADES, "Elige tu unidad."),
+  categoria: opcion(CATEGORIAS, "Elige de qué se trata."),
+  prioridad: opcion(PRIORIDADES, "Elige cuánto te afecta."),
+  titulo: obligatorio("qué pasa", 5, 120),
+  descripcion: obligatorio("el detalle", 10, 4000),
+  codigoEquipo: opcional.pipe(
+    z
+      .string()
+      .transform((s) => s.toUpperCase().replace(/\s/g, ""))
+      .pipe(z.string().regex(/^[A-Z]{2,3}-?\d{1,4}$/, "Escríbelo como en la etiqueta, por ejemplo NB-0007."))
+      .transform((s) => {
+        const [, p, n] = /^([A-Z]+)-?(\d+)$/.exec(s)!;
+        return `${p}-${n.padStart(4, "0")}`;
+      })
+      .nullable(),
+  ),
+});
+export type Solicitud = z.infer<typeof esquemaSolicitud>;
 
 export const esquemaAsignacion = z.object({
   tecnico: opcional.pipe(z.enum(TECNICOS, { error: "Técnico no válido." }).nullable()),

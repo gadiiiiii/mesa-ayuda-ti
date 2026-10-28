@@ -1,4 +1,4 @@
-import { date, index, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, date, index, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 import type { Categoria, Estado, EstadoEquipo, Prioridad, TipoEquipo } from "../dominio";
 
 const momento = (nombre: string) => timestamp(nombre, { withTimezone: true, mode: "date" });
@@ -46,6 +46,10 @@ export const tickets = pgTable(
     pausadoDesde: momento("pausado_desde"),
     /** Minutos hábiles que el ticket pasó en espera; alargan el plazo. */
     minutosPausa: integer("minutos_pausa").notNull().default(0),
+    /** Por dónde llegó: registrado por un técnico o pedido por el funcionario en el portal. */
+    origen: text("origen").$type<"mesa" | "portal">().notNull().default("mesa"),
+    /** Código para que el solicitante siga su ticket en el portal sin iniciar sesión (ABCD-2345). */
+    codigo: text("codigo").unique(),
   },
   (t) => [index("tickets_estado_idx").on(t.estado), index("tickets_equipo_idx").on(t.equipoId)],
 );
@@ -65,6 +69,8 @@ export const eventos = pgTable(
     texto: text("texto"),
     desde: text("desde"),
     hacia: text("hacia"),
+    /** Si el solicitante lo ve en el portal. Los comentarios son notas internas salvo que se marquen. */
+    publico: boolean("publico").notNull().default(false),
     creadoEn: momento("creado_en").notNull().defaultNow(),
   },
   (t) => [index("eventos_ticket_idx").on(t.ticketId)],

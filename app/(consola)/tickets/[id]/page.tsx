@@ -7,8 +7,8 @@ import { obtenerBD } from "@/lib/db";
 import { NOMBRE_CATEGORIA, NOMBRE_TIPO } from "@/lib/dominio";
 import { formatearConDia, formatearFechaHora } from "@/lib/formato";
 import { TEXTO_HORARIO } from "@/lib/horario";
-import { EstadoTicket, EtiquetaInventario, Folio, Plazo, PrioridadTicket } from "../../_componentes/Insignias";
-import { texto, type Parametros } from "../../_componentes/parametros";
+import { EstadoTicket, EtiquetaInventario, Folio, Plazo, PrioridadTicket } from "@/app/_componentes/Insignias";
+import { texto, type Parametros } from "@/app/_componentes/parametros";
 import AccionesEstado from "./AccionesEstado";
 import Asignacion from "./Asignacion";
 import Comentar from "./Comentar";
@@ -78,7 +78,7 @@ export default async function PaginaTicket({ params, searchParams }: Props) {
             <h2 id="titulo-historial" className="text-lg font-bold">
               Historial
             </h2>
-            <Historial eventos={eventos} ahora={ahora} />
+            <Historial eventos={eventos} ahora={ahora} solicitante={t.solicitante} origen={t.origen} />
             <Comentar id={t.id} />
           </section>
         </div>
@@ -103,6 +103,19 @@ export default async function PaginaTicket({ params, searchParams }: Props) {
               Datos
             </h2>
             <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              <dt className="text-muted-foreground">Llegó por</dt>
+              <dd>{t.origen === "portal" ? "Portal de solicitudes" : "Mesa de ayuda"}</dd>
+              {t.codigo && (
+                <>
+                  <dt className="text-muted-foreground">Seguimiento</dt>
+                  <dd>
+                    <span className="font-mono">{t.codigo}</span>{" "}
+                    <Link href={`/portal/seguimiento/${t.codigo}`} className="text-primary hover:underline">
+                      Ver como el solicitante
+                    </Link>
+                  </dd>
+                </>
+              )}
               <dt className="text-muted-foreground">Categoría</dt>
               <dd>{NOMBRE_CATEGORIA[t.categoria]}</dd>
               <dt className="text-muted-foreground">Creado</dt>

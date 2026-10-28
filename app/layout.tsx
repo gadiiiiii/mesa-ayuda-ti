@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "@/components/ui/sonner";
-import BarraSuperior from "./_componentes/BarraSuperior";
 // Fuentes servidas desde la propia app (sin pedirlas a Google): solo latín.
 import "@fontsource-variable/public-sans/index.css";
 import "@fontsource/ibm-plex-mono/latin-400.css";
@@ -32,10 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Saltar al contenido
         </a>
-        <BarraSuperior />
-        <main id="contenido" className="mx-auto max-w-[76rem] px-4 pt-6 pb-16 sm:px-6">
-          {children}
-        </main>
+        {children}
         <Toaster />
       </body>
     </html>

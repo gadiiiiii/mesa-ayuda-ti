@@ -1,3 +1,4 @@
+import { nuevoCodigo } from "./codigo";
 import type { BD } from "./db";
 import { aLocal, desdeLocal, habilesEntre, sumarDia, sumarHabiles, ventana } from "./horario";
 import { equipos, eventos, tickets } from "./db/esquema";
@@ -7,6 +8,8 @@ import {
   TECNICOS,
   UNIDADES,
   calcularVencimiento,
+  esEventoPublico,
+  estaPendiente,
   type Categoria,
   type Estado,
   type EstadoEquipo,
@@ -280,11 +283,19 @@ const NOTAS_ESPERA = [
   "Esperando la autorización de la jefatura.",
 ];
 
-const COMENTARIOS = [
-  "Revisé en terreno. Hay que volver con un repuesto.",
-  "El solicitante dice que el problema sigue en la tarde.",
-  "Le pedí al solicitante que reinicie el equipo y avise si se repite.",
-  "Me comuniqué por teléfono; lo reviso en la tarde.",
+/** Comentarios de técnicos: notas internas y respuestas que ve el solicitante. */
+const COMENTARIOS: readonly { texto: string; publico: boolean }[] = [
+  { texto: "Revisé en terreno. Hay que volver con un repuesto.", publico: false },
+  { texto: "El solicitante dice por teléfono que el problema sigue en la tarde.", publico: false },
+  { texto: "Le pedí reiniciar el equipo y avisarnos si se repite.", publico: true },
+  { texto: "Paso por su oficina en la tarde para revisarlo.", publico: true },
+];
+
+/** Lo que escribe el solicitante desde el portal. */
+const MENSAJES_SOLICITANTE = [
+  "Sigue igual. Ahora el mensaje aparece apenas enciendo el equipo.",
+  "Estaré en la oficina toda la mañana, pueden pasar cuando quieran.",
+  "Gracias, quedo atento.",
 ];
 
 const MOTIVOS_CIERRE = ["Duplicado de otro ticket.", "El solicitante indica que ya no lo necesita."];
@@ -392,7 +403,9 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
     const unidad = equipo?.unidad ?? az.elegir(UNIDADES);
     const solicitante = equipo?.responsable ?? persona();
     const tecnico = az.elegir(TECNICOS);
-    const ev: Fila["eventos"] = [{ tipo: "creado", autor: solicitante, creadoEn }];
+    // Casi la mitad llega por el portal; el resto lo registra un técnico que recibió el llamado o el correo.
+    const origen = az.siguiente() < 0.45 ? ("portal" as const) : ("mesa" as const);
+    const ev: Fila["eventos"] = [{ tipo: "creado", autor: origen === "portal" ? solicitante : az.elegir(TECNICOS), creadoEn }];
     // Todo se mide en horas hábiles desde la creación.
     const en = (horas: number) => sumarHabiles(creadoEn, horas * HORA);
 
@@ -433,7 +446,7 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
           creadoEn: pausadoDesde,
         });
       } else if (estado === "en_curso" && az.siguiente() < 0.4) {
-        ev.push({ tipo: "comentario", autor: tecnico, texto: az.elegir(COMENTARIOS), creadoEn: en(Math.min(edad * 0.9, tomado + 0.5)) });
+        ev.push({ tipo: "comentario", autor: tecnico, ...az.elegir(COMENTARIOS), creadoEn: en(Math.min(edad * 0.9, tomado + 0.5)) });
       }
     } else if (az.siguiente() < 0.04) {
       estado = "cerrado";
@@ -448,7 +461,7 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
     } else {
       tomar();
       if (az.siguiente() < 0.3)
-        ev.push({ tipo: "comentario", autor: tecnico, texto: az.elegir(COMENTARIOS), creadoEn: en(tomado + (duracion - tomado) / 2) });
+        ev.push({ tipo: "comentario", autor: tecnico, ...az.elegir(COMENTARIOS), creadoEn: en(tomado + (duracion - tomado) / 2) });
       resueltoEn = en(duracion);
       estado = "resuelto";
       ev.push({ tipo: "estado", autor: tecnico, desde: "en_curso", hacia: "resuelto", texto: plantilla.solucion, creadoEn: resueltoEn });
@@ -457,6 +470,12 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
         ev.push({ tipo: "estado", autor: tecnico, desde: "resuelto", hacia: "cerrado", creadoEn: en(duracion + 9) });
       }
     }
+
+    // Algunos solicitantes del portal agregan información mientras esperan.
+    if (origen === "portal" && estaPendiente(estado) && edad > 1 && az.siguiente() < 0.5) {
+      ev.push({ tipo: "comentario", autor: solicitante, texto: az.elegir(MENSAJES_SOLICITANTE), publico: true, creadoEn: en(edad * 0.6) });
+    }
+    for (const e of ev) e.publico ||= esEventoPublico(e.tipo!);
 
     const ultimo = ev.reduce((m, e) => (e.creadoEn! > m ? e.creadoEn! : m), creadoEn);
     filas.push({
@@ -475,6 +494,8 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
         venceEn: calcularVencimiento(creadoEn, prioridad),
         resueltoEn,
         pausadoDesde,
+        origen,
+        codigo: nuevoCodigo(() => az.siguiente()),
       },
       eventos: ev,
     });

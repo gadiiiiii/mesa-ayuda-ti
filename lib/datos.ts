@@ -19,7 +19,8 @@ import {
   type Prioridad,
   type TipoEquipo,
 } from "./dominio";
-import type { EquipoDatos, TicketNuevo } from "./validacion";
+import { nuevoCodigo } from "./codigo";
+import type { EquipoDatos, Solicitud, TicketNuevo } from "./validacion";
 
 export type Resultado<T = void> = { ok: true; valor: T } | { ok: false; error: string };
 const bien = <T>(valor: T): Resultado<T> => ({ ok: true, valor });
@@ -120,30 +121,58 @@ export async function obtenerTicket(bd: BD, id: number): Promise<DetalleTicket |
   return { ticket: fila.tickets, equipo: fila.equipos, eventos: historial };
 }
 
+type Transaccion = Parameters<Parameters<BD["transaction"]>[0]>[0];
+
+/** Inserta el ticket con un código de seguimiento libre y su evento de creación. */
+async function insertarTicket(
+  bd: BD,
+  datos: Omit<TicketNuevo, "equipoId"> & { equipoId: number | null; origen: "mesa" | "portal" },
+  autor: string,
+  ahora: Date,
+): Promise<{ id: number; codigo: string }> {
+  for (let intento = 0; ; intento++) {
+    const codigo = nuevoCodigo();
+    try {
+      return await bd.transaction(async (tx: Transaccion) => {
+        const [t] = await tx
+          .insert(tickets)
+          .values({
+            ...datos,
+            codigo,
+            creadoEn: ahora,
+            actualizadoEn: ahora,
+            venceEn: calcularVencimiento(ahora, datos.prioridad),
+          })
+          .returning({ id: tickets.id });
+        await tx.insert(eventos).values({ ticketId: t.id, tipo: "creado", autor, publico: true, creadoEn: ahora });
+        return { id: t.id, codigo };
+      });
+    } catch (err) {
+      // Un código repetido es casi imposible (31^8 combinaciones), pero si pasa se elige otro.
+      if (intento >= 2 || !String((err as { cause?: unknown })?.cause ?? err).includes("tickets_codigo_unique")) throw err;
+    }
+  }
+}
+
 export async function crearTicket(bd: BD, datos: TicketNuevo, autor: string, ahora: Date): Promise<Resultado<number>> {
   if (datos.equipoId) {
     const [e] = await bd.select({ id: equipos.id }).from(equipos).where(eq(equipos.id, datos.equipoId));
     if (!e) return mal("El equipo elegido ya no existe.");
   }
-  return bd.transaction(async (tx) => {
-    const [t] = await tx
-      .insert(tickets)
-      .values({
-        titulo: datos.titulo,
-        descripcion: datos.descripcion,
-        solicitante: datos.solicitante,
-        unidad: datos.unidad,
-        categoria: datos.categoria,
-        prioridad: datos.prioridad,
-        equipoId: datos.equipoId,
-        creadoEn: ahora,
-        actualizadoEn: ahora,
-        venceEn: calcularVencimiento(ahora, datos.prioridad),
-      })
-      .returning({ id: tickets.id });
-    await tx.insert(eventos).values({ ticketId: t.id, tipo: "creado", autor, creadoEn: ahora });
-    return bien(t.id);
-  });
+  const t = await insertarTicket(bd, { ...datos, origen: "mesa" }, autor, ahora);
+  return bien(t.id);
+}
+
+/** Una solicitud del portal. El equipo se indica por el código de su etiqueta. */
+export async function crearSolicitud(bd: BD, datos: Solicitud, ahora: Date): Promise<Resultado<{ id: number; codigo: string }>> {
+  let equipoId: number | null = null;
+  if (datos.codigoEquipo) {
+    const [e] = await bd.select({ id: equipos.id }).from(equipos).where(eq(equipos.codigo, datos.codigoEquipo));
+    if (!e) return mal(`No encontramos un equipo con el código ${datos.codigoEquipo}. Revisa la etiqueta o deja el campo vacío.`);
+    equipoId = e.id;
+  }
+  const { codigoEquipo: _codigo, ...resto } = datos;
+  return bien(await insertarTicket(bd, { ...resto, equipoId, origen: "portal" }, datos.solicitante, ahora));
 }
 
 export async function cambiarEstado(
@@ -177,20 +206,32 @@ export async function cambiarEstado(
 
     await tx.update(tickets).set(cambios).where(eq(tickets.id, id));
     if (asignar) {
-      await tx.insert(eventos).values({ ticketId: id, tipo: "asignacion", autor, desde: null, hacia: autor, creadoEn: ahora });
+      await tx
+        .insert(eventos)
+        .values({ ticketId: id, tipo: "asignacion", autor, desde: null, hacia: autor, publico: true, creadoEn: ahora });
     }
     await tx
       .insert(eventos)
-      .values({ ticketId: id, tipo: "estado", autor, desde: t.estado, hacia, texto: accion.nota ? nota : null, creadoEn: ahora });
+      .values({
+        ticketId: id,
+        tipo: "estado",
+        autor,
+        desde: t.estado,
+        hacia,
+        texto: accion.nota ? nota : null,
+        publico: true,
+        creadoEn: ahora,
+      });
   });
   return bien(undefined);
 }
 
-export async function comentar(bd: BD, id: number, texto: string, autor: string, ahora: Date): Promise<Resultado> {
+/** `publico`: respuesta que el solicitante ve en el portal; si no, nota interna. */
+export async function comentar(bd: BD, id: number, texto: string, autor: string, ahora: Date, publico = false): Promise<Resultado> {
   const [t] = await bd.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, id));
   if (!t) return mal("El ticket no existe.");
   await bd.transaction(async (tx) => {
-    await tx.insert(eventos).values({ ticketId: id, tipo: "comentario", autor, texto, creadoEn: ahora });
+    await tx.insert(eventos).values({ ticketId: id, tipo: "comentario", autor, texto, publico, creadoEn: ahora });
     await tx.update(tickets).set({ actualizadoEn: ahora }).where(eq(tickets.id, id));
   });
   return bien(undefined);
@@ -210,7 +251,7 @@ export async function actualizarAsignacion(
   const registro: (typeof eventos.$inferInsert)[] = [];
   if (datos.tecnico !== t.tecnico) {
     nuevos.tecnico = datos.tecnico;
-    registro.push({ ticketId: id, tipo: "asignacion", autor, desde: t.tecnico, hacia: datos.tecnico, creadoEn: ahora });
+    registro.push({ ticketId: id, tipo: "asignacion", autor, desde: t.tecnico, hacia: datos.tecnico, publico: true, creadoEn: ahora });
   }
   if (datos.prioridad !== t.prioridad) {
     nuevos.prioridad = datos.prioridad;
@@ -227,6 +268,52 @@ export async function actualizarAsignacion(
     await tx.insert(eventos).values(registro);
   });
   return bien({ cambios: registro.length });
+}
+
+// ── Portal: lo que ve quien pidió ayuda ────────────────────────────────────
+
+export interface Seguimiento {
+  ticket: Ticket;
+  equipoCodigo: string | null;
+  /** Solo los eventos públicos: nada de notas internas ni cambios de prioridad. */
+  eventos: Evento[];
+}
+
+export async function obtenerSeguimiento(bd: BD, codigo: string): Promise<Seguimiento | null> {
+  const [fila] = await bd
+    .select({ ticket: tickets, equipoCodigo: equipos.codigo })
+    .from(tickets)
+    .leftJoin(equipos, eq(tickets.equipoId, equipos.id))
+    .where(eq(tickets.codigo, codigo));
+  if (!fila) return null;
+  const historial = await bd
+    .select()
+    .from(eventos)
+    .where(and(eq(eventos.ticketId, fila.ticket.id), eq(eventos.publico, true)))
+    .orderBy(asc(eventos.creadoEn), asc(eventos.id));
+  return { ticket: fila.ticket, equipoCodigo: fila.equipoCodigo, eventos: historial };
+}
+
+/**
+ * El solicitante agrega información desde el portal. Si el ticket estaba resuelto y marca que
+ * el problema sigue, se reabre con su mensaje como motivo.
+ */
+export async function responderSolicitante(
+  bd: BD,
+  codigo: string,
+  texto: string,
+  reabrir: boolean,
+  ahora: Date,
+): Promise<Resultado<{ reabierto: boolean }>> {
+  const [t] = await bd.select().from(tickets).where(eq(tickets.codigo, codigo));
+  if (!t) return mal("No encontramos esa solicitud.");
+  if (t.estado === "cerrado") return mal("Esta solicitud está cerrada. Si necesitas ayuda de nuevo, crea una solicitud nueva.");
+  if (reabrir && t.estado === "resuelto") {
+    const r = await cambiarEstado(bd, t.id, "abierto", texto, t.solicitante, ahora);
+    return r.ok ? bien({ reabierto: true }) : r;
+  }
+  const r = await comentar(bd, t.id, texto, t.solicitante, ahora, true);
+  return r.ok ? bien({ reabierto: false }) : r;
 }
 
 // ── Inventario ─────────────────────────────────────────────────────────────

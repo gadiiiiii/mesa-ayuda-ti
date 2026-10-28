@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { UserRoundIcon } from "lucide-react";
 import { TECNICOS } from "@/lib/dominio";
-import { elegirTecnico } from "../acciones";
+import { elegirTecnico } from "@/app/acciones";
 
 /** Sin login: el visitante elige como qué técnico actúa. Queda registrado en el historial. */
 export default function SelectorTecnico({ actual }: { actual: string }) {
