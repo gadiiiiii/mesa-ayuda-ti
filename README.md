@@ -1,0 +1,99 @@
+# Mesa de ayuda TI
+
+[![CI](https://github.com/gadiiiiii/mesa-ayuda-ti/actions/workflows/ci.yml/badge.svg)](https://github.com/gadiiiiii/mesa-ayuda-ti/actions/workflows/ci.yml)
+
+Mesa de ayuda e inventario de equipos para el soporte informático de una oficina municipal. Se registran los tickets, cada uno con un **plazo según su prioridad**, y se asocian a los equipos del inventario para ver el historial de fallas de cada uno.
+
+Es una demo pública: no tiene inicio de sesión, los datos son inventados y cualquiera puede volver a los datos de ejemplo desde el panel.
+
+<p>
+  <img src="docs/panel.png" alt="Panel con los pendientes, los vencidos y los tickets que requieren atención" width="64%">
+  <img src="docs/movil.png" alt="La lista de tickets en el celular" width="28%">
+</p>
+
+## Qué hace
+
+### Tickets con plazo
+
+Cada ticket tiene un plazo en horas corridas que depende de su prioridad:
+
+| Prioridad | Cuándo | Plazo |
+|---|---|---|
+| Urgente | Detiene la atención de público o a toda una unidad | 4 horas |
+| Alta | Una persona no puede trabajar | 8 horas |
+| Media | Se puede trabajar, pero con dificultad | 24 horas |
+| Baja | Consultas, instalaciones y mejoras | 72 horas |
+
+Una **barra de plazo** muestra cuánto se ha consumido: gris a tiempo, ámbar en el último cuarto y roja cuando se venció. Al resolverse, el ticket queda marcado como resuelto dentro o fuera de plazo. Cambiar la prioridad recalcula el plazo desde que se creó el ticket.
+
+### Estados
+
+```
+Abierto ──Tomar──▶ En curso ──Resolver──▶ Resuelto ──Cerrar──▶ Cerrado
+   │                 │  ▲                     │                   │
+   │          Poner en espera / Retomar       └──── Reabrir ◀─────┘
+   └── Resolver, poner en espera o cerrar sin resolver
+```
+
+Resolver pide la solución, poner en espera pide qué se espera, y cerrar sin resolver o reabrir piden el motivo. Quien toma un ticket sin técnico queda asignado. Todo queda en el **historial** del ticket, con autor y hora, junto a los comentarios.
+
+### Inventario
+
+Equipos con código de inventario correlativo por tipo (`NB-0007`, `IMP-0012`, `SW-0002`…), marca, modelo, serie, unidad, responsable, estado (en uso, en bodega, en reparación, de baja), IP y MAC. La IP y la MAC se validan y se normalizan: la MAC se acepta con dos puntos, guiones o en formato Cisco (`001a.2b3c.4d5e`). La ficha de cada equipo muestra todos sus tickets y permite crear uno nuevo ya asociado.
+
+### Panel
+
+Pendientes, vencidos, por vencer, sin asignar, resueltos en la semana y el porcentaje resuelto dentro del plazo en los últimos 30 días. Debajo, los tickets que requieren atención y gráficos de pendientes por categoría, carga por técnico y estado del inventario.
+
+### Sin inicio de sesión
+
+Arriba a la derecha se elige **como qué técnico actúas** (se guarda en una cookie). Ese nombre queda en el historial de lo que hagas.
+
+![Ficha de un ticket con su historial](docs/ticket.png)
+
+## Cómo está hecho
+
+- [Next.js](https://nextjs.org) (App Router, Server Components y Server Actions) + TypeScript.
+- **Postgres** con [Drizzle ORM](https://orm.drizzle.team):
+  - En producción, [Neon](https://neon.tech) (Postgres serverless) a través de la variable `DATABASE_URL`.
+  - En desarrollo y en los tests, [PGlite](https://pglite.dev): el mismo Postgres compilado a WebAssembly, sin instalar nada. Se guarda en `.pglite/` o en memoria.
+  - Migraciones SQL en [`drizzle/`](drizzle), generadas desde el esquema ([`lib/db/esquema.ts`](lib/db/esquema.ts)). Antes de cada `dev` y `build` se aplican las pendientes y, si la base está vacía, se cargan los datos de ejemplo ([`scripts/preparar-db.ts`](scripts/preparar-db.ts)).
+- Validación de formularios con [Zod](https://zod.dev); los errores se muestran en cada campo y no se pierde lo escrito.
+- Tailwind CSS v4 y componentes con la estructura de shadcn/ui (Radix UI). Sistema de diseño en [`DESIGN.md`](DESIGN.md).
+- Fechas siempre en hora de Chile, aunque el servidor corra en UTC.
+- Accesibilidad: auditada con axe-core (WCAG 2.1 AA, modo claro y oscuro, sin infracciones), navegable con teclado, selects nativos en el celular y los estados nunca se distinguen solo por color.
+- La lógica está separada de la interfaz:
+  - [`lib/dominio.ts`](lib/dominio.ts): estados y cambios permitidos, plazos, códigos de inventario.
+  - [`lib/datos.ts`](lib/datos.ts): consultas y cambios en la base, cada cambio de estado en una transacción junto a su registro en el historial.
+  - [`lib/semilla.ts`](lib/semilla.ts): datos de ejemplo reproducibles, con fechas relativas a hoy.
+- **Tests con [Vitest](https://vitest.dev)**, contra un Postgres real en memoria (PGlite): ciclo de vida completo de un ticket, cambios no permitidos, filtros y búsqueda, códigos de inventario y datos de ejemplo.
+- GitHub Actions corre los tests y el build en cada push.
+
+## Desarrollo local
+
+```bash
+npm install
+npm run dev      # http://localhost:3000, con una base PGlite en .pglite/
+npm test
+npm run build
+```
+
+Para cambiar el esquema: edita `lib/db/esquema.ts` y genera la migración con `npm run db:generar`.
+
+## Despliegue en Vercel
+
+1. Importa el repositorio en Vercel.
+2. En la pestaña **Storage** del proyecto, crea una base **Neon** (plan gratuito) y conéctala al proyecto con **Connect Project**. Vercel agrega las variables `DATABASE_URL` y `DATABASE_URL_UNPOOLED`.
+3. Vuelve a desplegar. El build aplica las migraciones y carga los datos de ejemplo.
+
+## Hoja de ruta
+
+- [x] Tickets con plazos, historial y asignación; inventario; panel; demo pública con datos de ejemplo.
+- [ ] Inicio de sesión con roles (quien pide ayuda y técnico).
+- [ ] Plazos en horas hábiles, con feriados.
+- [ ] Avisos por correo al solicitante cuando su ticket se resuelve.
+- [ ] Adjuntar capturas de pantalla a un ticket.
+
+## Licencia
+
+MIT — Gadiel Vega Salgado

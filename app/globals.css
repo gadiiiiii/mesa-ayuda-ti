@@ -1,0 +1,97 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Tokens del DESIGN.md. Las pantallas los usan por nombre (bg-card, text-warning…). */
+:root {
+  --background: #e9edf0;
+  --foreground: #17212b;
+  --card: #ffffff;
+  --muted: #e3e8ec;
+  --muted-foreground: #56636f;
+  --border: #d2d9df;
+  --primary: #0d6577;
+  --primary-foreground: #ffffff;
+  --primary-soft: #dcedf1;
+  --success: #1c6b3e;
+  --success-soft: #ddf0e4;
+  --warning: #8a5100;
+  --warning-soft: #fbecd6;
+  --destructive: #b3261e;
+  --destructive-soft: #fbe2df;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #101418;
+    --foreground: #e3e8ec;
+    --card: #181d22;
+    --muted: #222930;
+    --muted-foreground: #98a4ae;
+    --border: #2c343c;
+    --primary: #5cc3d6;
+    --primary-foreground: #0b1418;
+    --primary-soft: #14323a;
+    --success: #71d19b;
+    --success-soft: #14301f;
+    --warning: #f2b35a;
+    --warning-soft: #3a2810;
+    --destructive: #ff9087;
+    --destructive-soft: #3c1a17;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--primary);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+
+  --font-sans: "Public Sans Variable", "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background font-sans text-base text-foreground antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
+  }
+  :focus-visible {
+    outline-color: var(--primary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

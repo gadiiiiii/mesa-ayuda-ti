@@ -1,0 +1,244 @@
+/**
+ * Reglas de la mesa de ayuda: estados de un ticket y cómo se pasa de uno a otro,
+ * plazos por prioridad e inventario. No depende de la base de datos.
+ */
+
+// ── Tickets ────────────────────────────────────────────────────────────────
+
+export const ESTADOS = ["abierto", "en_curso", "en_espera", "resuelto", "cerrado"] as const;
+export type Estado = (typeof ESTADOS)[number];
+
+export const NOMBRE_ESTADO: Record<Estado, string> = {
+  abierto: "Abierto",
+  en_curso: "En curso",
+  en_espera: "En espera",
+  resuelto: "Resuelto",
+  cerrado: "Cerrado",
+};
+
+/** Estados en que el ticket todavía necesita trabajo. */
+export const ESTADOS_PENDIENTES: readonly Estado[] = ["abierto", "en_curso", "en_espera"];
+export const estaPendiente = (e: Estado) => ESTADOS_PENDIENTES.includes(e);
+
+export interface Accion {
+  hacia: Estado;
+  /** Texto del botón. */
+  etiqueta: string;
+  /** Si hay que escribir una nota (la solución, el motivo de la espera…). */
+  nota: null | { etiqueta: string; ayuda: string };
+}
+
+const NOTA_SOLUCION = { etiqueta: "Solución", ayuda: "Qué se hizo para resolverlo. El solicitante la va a leer." };
+const NOTA_ESPERA = { etiqueta: "Qué se espera", ayuda: "Por ejemplo: un repuesto, una respuesta del proveedor o del solicitante." };
+const NOTA_CIERRE = { etiqueta: "Motivo del cierre", ayuda: "Por ejemplo: duplicado, no corresponde a TI o el solicitante lo retiró." };
+const NOTA_REAPERTURA = { etiqueta: "Motivo", ayuda: "Por qué se vuelve a abrir." };
+
+/** Qué se puede hacer con un ticket según su estado, en el orden en que se muestran los botones. */
+export const ACCIONES: Record<Estado, Accion[]> = {
+  abierto: [
+    { hacia: "en_curso", etiqueta: "Tomar ticket", nota: null },
+    { hacia: "resuelto", etiqueta: "Resolver", nota: NOTA_SOLUCION },
+    { hacia: "en_espera", etiqueta: "Poner en espera", nota: NOTA_ESPERA },
+    { hacia: "cerrado", etiqueta: "Cerrar sin resolver", nota: NOTA_CIERRE },
+  ],
+  en_curso: [
+    { hacia: "resuelto", etiqueta: "Resolver", nota: NOTA_SOLUCION },
+    { hacia: "en_espera", etiqueta: "Poner en espera", nota: NOTA_ESPERA },
+    { hacia: "abierto", etiqueta: "Devolver a la cola", nota: null },
+  ],
+  en_espera: [
+    { hacia: "en_curso", etiqueta: "Retomar", nota: null },
+    { hacia: "resuelto", etiqueta: "Resolver", nota: NOTA_SOLUCION },
+  ],
+  resuelto: [
+    { hacia: "cerrado", etiqueta: "Cerrar", nota: null },
+    { hacia: "abierto", etiqueta: "Reabrir", nota: NOTA_REAPERTURA },
+  ],
+  cerrado: [{ hacia: "abierto", etiqueta: "Reabrir", nota: NOTA_REAPERTURA }],
+};
+
+export function accionPara(desde: Estado, hacia: Estado): Accion | null {
+  return ACCIONES[desde].find((a) => a.hacia === hacia) ?? null;
+}
+
+export const PRIORIDADES = ["baja", "media", "alta", "urgente"] as const;
+export type Prioridad = (typeof PRIORIDADES)[number];
+
+export const NOMBRE_PRIORIDAD: Record<Prioridad, string> = {
+  baja: "Baja",
+  media: "Media",
+  alta: "Alta",
+  urgente: "Urgente",
+};
+
+/** Horas corridas para resolver, según la prioridad. */
+export const HORAS_PLAZO: Record<Prioridad, number> = { urgente: 4, alta: 8, media: 24, baja: 72 };
+
+export const DESCRIPCION_PRIORIDAD: Record<Prioridad, string> = {
+  urgente: "Detiene la atención de público o a toda una unidad. Plazo: 4 horas.",
+  alta: "Una persona no puede trabajar. Plazo: 8 horas.",
+  media: "Se puede trabajar, pero con dificultad. Plazo: 24 horas.",
+  baja: "Consultas, instalaciones y mejoras. Plazo: 72 horas.",
+};
+
+export const CATEGORIAS = ["hardware", "software", "red", "impresoras", "cuentas", "telefonia", "otro"] as const;
+export type Categoria = (typeof CATEGORIAS)[number];
+
+export const NOMBRE_CATEGORIA: Record<Categoria, string> = {
+  hardware: "Hardware",
+  software: "Software",
+  red: "Red e internet",
+  impresoras: "Impresoras",
+  cuentas: "Cuentas y accesos",
+  telefonia: "Telefonía",
+  otro: "Otro",
+};
+
+const HORA = 3_600_000;
+
+export function calcularVencimiento(creadoEn: Date, prioridad: Prioridad): Date {
+  return new Date(creadoEn.getTime() + HORAS_PLAZO[prioridad] * HORA);
+}
+
+export type EstadoPlazo = "a_tiempo" | "por_vencer" | "vencido" | "cumplido" | "incumplido" | "sin_plazo";
+
+export interface Plazo {
+  estado: EstadoPlazo;
+  /** Milisegundos: positivo si falta, negativo si ya pasó. Respecto de la resolución si está resuelto. */
+  diferencia: number;
+}
+
+/**
+ * Estado del plazo de un ticket. Mientras está pendiente se compara con `ahora`
+ * («por vencer» cuando queda un cuarto del plazo o menos); una vez resuelto, con la fecha de resolución.
+ * Un ticket cerrado sin resolver no tiene plazo que cumplir.
+ */
+export function plazo(
+  t: { estado: Estado; prioridad: Prioridad; creadoEn: Date; venceEn: Date; resueltoEn: Date | null },
+  ahora: Date,
+): Plazo {
+  if (estaPendiente(t.estado)) {
+    const diferencia = t.venceEn.getTime() - ahora.getTime();
+    const total = t.venceEn.getTime() - t.creadoEn.getTime();
+    return { estado: diferencia < 0 ? "vencido" : diferencia <= total / 4 ? "por_vencer" : "a_tiempo", diferencia };
+  }
+  if (!t.resueltoEn) return { estado: "sin_plazo", diferencia: 0 };
+  const diferencia = t.venceEn.getTime() - t.resueltoEn.getTime();
+  return { estado: diferencia >= 0 ? "cumplido" : "incumplido", diferencia };
+}
+
+/** «3 h 20 min», «2 d 4 h», «15 min». */
+export function duracion(ms: number): string {
+  const min = Math.max(0, Math.round(Math.abs(ms) / 60_000));
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  // Desde 10 horas los minutos ya no aportan.
+  if (h < 24) return min % 60 && h < 10 ? `${h} h ${min % 60} min` : `${h} h`;
+  const d = Math.floor(h / 24);
+  return h % 24 ? `${d} d ${h % 24} h` : `${d} d`;
+}
+
+export function textoPlazo(p: Plazo): string {
+  switch (p.estado) {
+    case "a_tiempo":
+    case "por_vencer":
+      return `Vence en ${duracion(p.diferencia)}`;
+    case "vencido":
+      return `Vencido hace ${duracion(p.diferencia)}`;
+    case "cumplido":
+      return "Resuelto dentro del plazo";
+    case "incumplido":
+      return `Resuelto ${duracion(p.diferencia)} fuera de plazo`;
+    case "sin_plazo":
+      return "Cerrado sin resolver";
+  }
+}
+
+// ── Inventario ─────────────────────────────────────────────────────────────
+
+export const TIPOS_EQUIPO = [
+  "notebook",
+  "escritorio",
+  "monitor",
+  "impresora",
+  "switch",
+  "router",
+  "access_point",
+  "telefono",
+  "otro",
+] as const;
+export type TipoEquipo = (typeof TIPOS_EQUIPO)[number];
+
+export const NOMBRE_TIPO: Record<TipoEquipo, string> = {
+  notebook: "Notebook",
+  escritorio: "PC de escritorio",
+  monitor: "Monitor",
+  impresora: "Impresora",
+  switch: "Switch",
+  router: "Router",
+  access_point: "Access point",
+  telefono: "Teléfono IP",
+  otro: "Otro",
+};
+
+/** Prefijo del código de inventario (NB-0007, IMP-0012…). */
+export const PREFIJO_TIPO: Record<TipoEquipo, string> = {
+  notebook: "NB",
+  escritorio: "PC",
+  monitor: "MON",
+  impresora: "IMP",
+  switch: "SW",
+  router: "RT",
+  access_point: "AP",
+  telefono: "TEL",
+  otro: "OTR",
+};
+
+/** Tipos que normalmente tienen IP fija en la red. */
+export const TIPOS_DE_RED: readonly TipoEquipo[] = ["impresora", "switch", "router", "access_point", "telefono"];
+
+export const ESTADOS_EQUIPO = ["en_uso", "en_bodega", "en_reparacion", "de_baja"] as const;
+export type EstadoEquipo = (typeof ESTADOS_EQUIPO)[number];
+
+export const NOMBRE_ESTADO_EQUIPO: Record<EstadoEquipo, string> = {
+  en_uso: "En uso",
+  en_bodega: "En bodega",
+  en_reparacion: "En reparación",
+  de_baja: "De baja",
+};
+
+/** El siguiente código libre para un tipo: el mayor número usado con ese prefijo, más uno. */
+export function siguienteCodigo(tipo: TipoEquipo, existentes: readonly string[]): string {
+  const prefijo = PREFIJO_TIPO[tipo];
+  const patron = new RegExp(`^${prefijo}-(\\d+)$`);
+  let mayor = 0;
+  for (const c of existentes) {
+    const m = patron.exec(c);
+    if (m) mayor = Math.max(mayor, Number(m[1]));
+  }
+  return `${prefijo}-${String(mayor + 1).padStart(4, "0")}`;
+}
+
+/** Unidades municipales que piden soporte. */
+export const UNIDADES = [
+  "Alcaldía",
+  "Secretaría Municipal",
+  "Administración y Finanzas",
+  "Dirección de Obras",
+  "Tránsito",
+  "DIDECO",
+  "Transparencia",
+  "Informática",
+  "Oficina de Partes",
+  "Juzgado de Policía Local",
+] as const;
+
+/** Equipo técnico de la demo. Sin inicio de sesión, cada visitante elige como quién actúa. */
+export const TECNICOS = ["Camila Rojas", "Diego Fuentes", "Valentina Soto"] as const;
+export type Tecnico = (typeof TECNICOS)[number];
+export const esTecnico = (x: unknown): x is Tecnico => typeof x === "string" && (TECNICOS as readonly string[]).includes(x);
+
+export const esUno =
+  <T extends string>(lista: readonly T[]) =>
+  (x: unknown): x is T =>
+    typeof x === "string" && (lista as readonly string[]).includes(x);
