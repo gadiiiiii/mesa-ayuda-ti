@@ -33,11 +33,16 @@ export default async function PaginaTickets({ searchParams }: { searchParams: Pr
             {f.estado === "pendientes" ? "Los pendientes, ordenados por el plazo que vence primero." : "Los más recientes primero."}
           </p>
         </div>
-        <Button asChild>
-          <Link href="/tickets/nuevo">
-            <PlusIcon /> Nuevo ticket
+        <div className="flex flex-wrap items-center gap-4">
+          <Link href="/problemas" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline">
+            Problemas
           </Link>
-        </Button>
+          <Button asChild>
+            <Link href="/tickets/nuevo">
+              <PlusIcon /> Nuevo ticket
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="mt-6">

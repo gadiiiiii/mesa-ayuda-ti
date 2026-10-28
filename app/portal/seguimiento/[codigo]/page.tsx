@@ -55,6 +55,11 @@ export default async function SeguimientoPage({ params, searchParams }: Props) {
         </h2>
         <EstadoTicket estado={t.estado} className="text-lg" />
         <p className="mt-1">{ESTADO_PARA_SOLICITANTE[t.estado]}</p>
+        {s.problemaAbierto && estaPendiente(t.estado) && (
+          <p className="mt-3 rounded-md border border-border bg-muted/60 px-3 py-2 text-sm">
+            Hay más personas con el mismo problema. Lo estamos resolviendo en conjunto y te avisaremos aquí cuando esté listo.
+          </p>
+        )}
         <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 border-t border-border pt-4 text-sm">
           <dt className="text-muted-foreground">Técnico a cargo</dt>
           <dd>{t.tecnico ?? "Todavía sin asignar"}</dd>

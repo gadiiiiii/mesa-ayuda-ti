@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, like, ne, or, sql, type SQL } from "drizzle-orm";
 import type { BD } from "./db";
-import { equipos, eventos, reglasAsignacion, tecnicos, tickets, type Equipo, type Evento, type Ticket } from "./db/esquema";
+import { equipos, eventos, problemas, reglasAsignacion, tecnicos, tickets, type Equipo, type Evento, type Ticket } from "./db/esquema";
 import {
   CATEGORIAS,
   ESTADOS_EQUIPO,
@@ -41,6 +41,7 @@ export interface FiltrosTickets {
   tecnico?: string;
   q?: string;
   equipoId?: number;
+  problemaId?: number;
 }
 
 export type FilaTicket = Pick<
@@ -85,6 +86,7 @@ function condicionesTickets(f: FiltrosTickets): SQL[] {
   if (f.tecnico === "sin_asignar") c.push(isNull(tickets.tecnico));
   else if (f.tecnico) c.push(eq(tickets.tecnico, f.tecnico));
   if (f.equipoId) c.push(eq(tickets.equipoId, f.equipoId));
+  if (f.problemaId) c.push(eq(tickets.problemaId, f.problemaId));
   const q = f.q?.trim();
   if (q) {
     const numero = /^#?(\d+)$/.exec(q);
@@ -368,15 +370,18 @@ export async function contarMisPendientes(bd: BD, tecnico: string): Promise<numb
 export interface Seguimiento {
   ticket: Ticket;
   equipoCodigo: string | null;
+  /** Si forma parte de un problema que todavía se está resolviendo (afecta a más personas). */
+  problemaAbierto: boolean;
   /** Solo los eventos públicos: nada de notas internas ni cambios de prioridad. */
   eventos: Evento[];
 }
 
 export async function obtenerSeguimiento(bd: BD, codigo: string): Promise<Seguimiento | null> {
   const [fila] = await bd
-    .select({ ticket: tickets, equipoCodigo: equipos.codigo })
+    .select({ ticket: tickets, equipoCodigo: equipos.codigo, estadoProblema: problemas.estado })
     .from(tickets)
     .leftJoin(equipos, eq(tickets.equipoId, equipos.id))
+    .leftJoin(problemas, eq(tickets.problemaId, problemas.id))
     .where(eq(tickets.codigo, codigo));
   if (!fila) return null;
   const historial = await bd
@@ -384,7 +389,7 @@ export async function obtenerSeguimiento(bd: BD, codigo: string): Promise<Seguim
     .from(eventos)
     .where(and(eq(eventos.ticketId, fila.ticket.id), eq(eventos.publico, true)))
     .orderBy(asc(eventos.creadoEn), asc(eventos.id));
-  return { ticket: fila.ticket, equipoCodigo: fila.equipoCodigo, eventos: historial };
+  return { ticket: fila.ticket, equipoCodigo: fila.equipoCodigo, problemaAbierto: fila.estadoProblema === "abierto", eventos: historial };
 }
 
 /**
@@ -587,5 +592,7 @@ export async function resumen(bd: BD, ahora: Date): Promise<Resumen> {
 
 /** Borra todo (y reinicia los números de ticket). Lo usa el botón de restablecer la demo. */
 export async function vaciar(bd: BD): Promise<void> {
-  await bd.execute(sql`TRUNCATE ${eventos}, ${tickets}, ${equipos}, ${reglasAsignacion}, ${tecnicos} RESTART IDENTITY CASCADE`);
+  await bd.execute(
+    sql`TRUNCATE ${eventos}, ${tickets}, ${equipos}, ${reglasAsignacion}, ${tecnicos}, ${problemas} RESTART IDENTITY CASCADE`,
+  );
 }

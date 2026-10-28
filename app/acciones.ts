@@ -18,6 +18,7 @@ import {
 import { obtenerBD } from "@/lib/db";
 import { CATEGORIAS, MODOS_ASIGNACION, esTecnico, type Categoria, type ModoAsignacion, type Regla } from "@/lib/dominio";
 import { normalizarCodigo } from "@/lib/codigo";
+import { crearProblema, marcarDuplicado, resolverProblema, vincularProblema } from "@/lib/relacionados";
 import { sembrar } from "@/lib/semilla";
 import {
   erroresPorCampo,
@@ -25,6 +26,9 @@ import {
   esquemaCambioEstado,
   esquemaComentario,
   esquemaEquipo,
+  esquemaFolio,
+  esquemaProblema,
+  esquemaResolverProblema,
   esquemaSolicitud,
   esquemaTicketNuevo,
   valores,
@@ -164,4 +168,64 @@ export async function accionGuardarReglas(_: EstadoFormulario, form: FormData): 
   await guardarReglas(await obtenerBD(), reglas, disponibles);
   revalidatePath("/", "layout");
   return { ok: Date.now() };
+}
+
+// ── Tickets relacionados ───────────────────────────────────────────────────
+
+export async function accionMarcarDuplicado(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const id = idDe(form);
+  const folio = esquemaFolio.safeParse(form.get("folio") ?? "");
+  if (!id) return { mensaje: "Datos no válidos. Recarga la página." };
+  if (!folio.success) return { errores: { folio: folio.error.issues[0].message }, valores: valores(form) };
+  const r = await marcarDuplicado(await obtenerBD(), id, folio.data, await tecnicoActual(), new Date());
+  if (!r.ok) return { errores: { folio: r.error }, valores: valores(form) };
+  revalidatePath("/", "layout");
+  return { ok: Date.now(), mensaje: `Cerrado como duplicado del #${r.valor}.` };
+}
+
+export async function accionVincularProblema(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const id = idDe(form);
+  const valor = String(form.get("problema") ?? "");
+  const problemaId = valor === "" ? null : Number(valor);
+  if (!id || (problemaId !== null && !Number.isInteger(problemaId))) return { mensaje: "Datos no válidos. Recarga la página." };
+  const r = await vincularProblema(await obtenerBD(), id, problemaId, await tecnicoActual(), new Date());
+  if (!r.ok) return { mensaje: r.error };
+  revalidatePath("/", "layout");
+  return { ok: Date.now(), mensaje: problemaId ? "Vinculado al problema." : "Se quitó del problema." };
+}
+
+export async function accionCrearProblema(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const datos = valores(form);
+  const v = esquemaProblema.safeParse(datos);
+  if (!v.success) return { errores: erroresPorCampo(v.error), valores: datos, intento: Date.now() };
+  const ticketId = idDe(form) ?? undefined;
+  const r = await crearProblema(await obtenerBD(), v.data, await tecnicoActual(), new Date(), ticketId);
+  if (!r.ok) return { mensaje: r.error, valores: datos, intento: Date.now() };
+  revalidatePath("/", "layout");
+  redirect(`/problemas/${r.valor}`);
+}
+
+/** Agrega un ticket (por folio) a un problema desde la ficha del problema. */
+export async function accionAgregarAProblema(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const problemaId = Number(form.get("problemaId"));
+  const folio = esquemaFolio.safeParse(form.get("folio") ?? "");
+  if (!Number.isInteger(problemaId)) return { mensaje: "Datos no válidos. Recarga la página." };
+  if (!folio.success) return { errores: { folio: folio.error.issues[0].message }, valores: valores(form) };
+  const r = await vincularProblema(await obtenerBD(), folio.data, problemaId, await tecnicoActual(), new Date());
+  if (!r.ok) return { errores: { folio: r.error }, valores: valores(form) };
+  revalidatePath("/", "layout");
+  return { ok: Date.now(), mensaje: `Se agregó el ticket #${folio.data}.` };
+}
+
+export async function accionResolverProblema(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const id = idDe(form);
+  const datos = valores(form);
+  const v = esquemaResolverProblema.safeParse(datos);
+  if (!id) return { mensaje: "Datos no válidos. Recarga la página." };
+  if (!v.success) return { errores: erroresPorCampo(v.error), valores: datos };
+  const r = await resolverProblema(await obtenerBD(), id, v.data, await tecnicoActual(), new Date());
+  if (!r.ok) return { mensaje: r.error, valores: datos };
+  revalidatePath("/", "layout");
+  const n = r.valor.ticketsResueltos;
+  return { ok: Date.now(), mensaje: n ? `Problema resuelto, junto con ${n === 1 ? "1 ticket" : `${n} tickets`}.` : "Problema resuelto." };
 }

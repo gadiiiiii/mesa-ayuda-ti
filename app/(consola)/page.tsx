@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { resumen } from "@/lib/datos";
+import { listarProblemas } from "@/lib/relacionados";
 import { obtenerBD } from "@/lib/db";
 import { NOMBRE_CATEGORIA, NOMBRE_ESTADO_EQUIPO } from "@/lib/dominio";
 import { formatearDia } from "@/lib/formato";
@@ -83,7 +84,8 @@ function Barras({ filas, max }: { filas: { etiqueta: string; n: number; href?: s
 
 export default async function Panel() {
   const ahora = new Date();
-  const r = await resumen(await obtenerBD(), ahora);
+  const bd = await obtenerBD();
+  const [r, problemasAbiertos] = await Promise.all([resumen(bd, ahora), listarProblemas(bd, true)]);
   const maxCat = Math.max(1, ...r.porCategoria.map((c) => c.n));
   const maxTec = Math.max(1, ...r.porTecnico.map((t) => t.n));
   const maxEq = Math.max(1, ...r.equiposPorEstado.map((e) => e.n));
@@ -134,6 +136,36 @@ export default async function Panel() {
           </p>
         )}
       </section>
+
+      {problemasAbiertos.length > 0 && (
+        <section aria-labelledby="titulo-problemas" className="mt-8">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <h2 id="titulo-problemas" className="text-lg font-bold">
+              Problemas abiertos
+            </h2>
+            <Link href="/problemas" className="text-sm font-semibold text-primary hover:underline">
+              Ver todos
+            </Link>
+          </div>
+          <ul className="mt-3 flex flex-col gap-2">
+            {problemasAbiertos.map((p) => (
+              <li key={p.id}>
+                <Link
+                  href={`/problemas/${p.id}`}
+                  className="flex flex-wrap items-baseline justify-between gap-x-4 rounded-lg border border-border border-l-[3px] border-l-warning bg-card px-4 py-3 hover:border-muted-foreground"
+                >
+                  <span className="font-semibold">
+                    {p.titulo} <span className="font-mono font-normal text-muted-foreground">#{p.id}</span>
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {p.pendientes === 1 ? "1 ticket pendiente" : `${p.pendientes} tickets pendientes`}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="mt-8 grid items-start gap-6 md:grid-cols-2 lg:grid-cols-3">
         <section aria-labelledby="titulo-categorias" className="rounded-lg border border-border bg-card p-5">

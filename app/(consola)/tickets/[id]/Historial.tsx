@@ -1,4 +1,4 @@
-import { ArrowRightLeftIcon, MessageSquareIcon, PlusCircleIcon, SignalIcon, UserRoundIcon } from "lucide-react";
+import { ArrowRightLeftIcon, Link2Icon, MessageSquareIcon, PlusCircleIcon, SignalIcon, UserRoundIcon } from "lucide-react";
 import type { Evento } from "@/lib/db/esquema";
 import { AUTOR_SISTEMA, NOMBRE_ESTADO, NOMBRE_PRIORIDAD, type Estado, type Prioridad } from "@/lib/dominio";
 import { formatearFechaHora, hace } from "@/lib/formato";
@@ -12,6 +12,14 @@ function describir(e: Evento, c: Contexto): { texto: React.ReactNode; nota?: str
   const quien = <strong className="font-semibold">{e.autor}</strong>;
   const delSolicitante = e.autor === c.solicitante;
   switch (e.tipo) {
+    case "relacion":
+      return {
+        texto: (
+          <>
+            {quien} {e.texto ? e.texto.charAt(0).toLowerCase() + e.texto.slice(1) : "cambió una relación"}
+          </>
+        ),
+      };
     case "creado":
       return { texto: c.origen === "portal" ? <>{quien} pidió ayuda desde el portal</> : <>{quien} registró el ticket</> };
     case "comentario":
@@ -80,6 +88,7 @@ const ICONO = {
   estado: ArrowRightLeftIcon,
   asignacion: UserRoundIcon,
   prioridad: SignalIcon,
+  relacion: Link2Icon,
 };
 
 export default function Historial({ eventos, ahora, ...contexto }: { eventos: Evento[]; ahora: Date } & Contexto) {

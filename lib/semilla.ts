@@ -1,5 +1,6 @@
 import { nuevoCodigo } from "./codigo";
 import type { BD } from "./db";
+import { crearProblema, marcarDuplicado, resolverProblema, vincularProblema } from "./relacionados";
 import { aLocal, desdeLocal, habilesEntre, sumarDia, sumarHabiles, ventana } from "./horario";
 import { equipos, eventos, reglasAsignacion, tecnicos, tickets } from "./db/esquema";
 import {
@@ -519,5 +520,71 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
     .values(filas.map((f) => f.ticket))
     .returning({ id: tickets.id });
   await bd.insert(eventos).values(filas.flatMap((f, i) => f.eventos.map((e) => ({ ...e, ticketId: ids[i].id }))));
+
+  // ── Relacionados: un duplicado, un problema abierto y uno ya resuelto ──
+  const conId = filas.map((f, i) => ({ ...f.ticket, id: ids[i].id }));
+  const pendientes = conId.filter((t) => estaPendiente(t.estado!));
+  const despuesDe = (fechas: Date[]) => {
+    const d = sumarHabiles(new Date(Math.max(...fechas.map((f) => f.getTime()))), HORA / 2);
+    return d > ahora ? ahora : d;
+  };
+
+  // Dos pendientes iguales: el más nuevo se cierra como duplicado del más antiguo.
+  let cerradoComoDuplicado = 0;
+  for (const t of pendientes) {
+    const gemelo = pendientes.find((o) => o.id > t.id && o.titulo === t.titulo && o.unidad === t.unidad);
+    if (gemelo) {
+      await marcarDuplicado(bd, gemelo.id, t.id, gemelo.tecnico ?? TECNICOS[0], despuesDe([gemelo.creadoEn!]));
+      cerradoComoDuplicado = gemelo.id;
+      break;
+    }
+  }
+
+  // Problema abierto: los pendientes de red se agrupan.
+  const deRed = pendientes.filter((t) => t.categoria === "red" && t.id !== cerradoComoDuplicado).slice(0, 3);
+  if (deRed.length >= 2) {
+    const cuando = despuesDe(deRed.map((t) => t.creadoEn!));
+    const p = await crearProblema(
+      bd,
+      {
+        titulo: "Cortes de red intermitentes en varias oficinas",
+        descripcion:
+          "Desde esta semana varias unidades reportan que se cae internet o la red interna por algunos minutos, sobre todo en la tarde.",
+      },
+      "Diego Fuentes",
+      cuando,
+    );
+    if (p.ok) for (const t of deRed) await vincularProblema(bd, t.id, p.valor, "Diego Fuentes", cuando);
+  }
+
+  // Problema resuelto: los anexos que pierden el tono tenían una causa común.
+  const anexos = conId
+    .filter((t) => t.titulo === "El anexo no tiene tono" && t.resueltoEn)
+    .sort((a, b) => b.resueltoEn!.getTime() - a.resueltoEn!.getTime())
+    .slice(0, 4);
+  if (anexos.length >= 2) {
+    const cuando = despuesDe(anexos.map((t) => t.creadoEn!));
+    const p = await crearProblema(
+      bd,
+      { titulo: "Los teléfonos IP pierden el registro en la central", descripcion: "Varios anexos quedan sin tono a la vez, en distintas unidades." },
+      "Diego Fuentes",
+      cuando,
+    );
+    if (p.ok) {
+      for (const t of anexos) await vincularProblema(bd, t.id, p.valor, "Diego Fuentes", cuando);
+      await resolverProblema(
+        bd,
+        p.valor,
+        {
+          causa: "La central telefónica se reiniciaba con los cortes de energía y los teléfonos no volvían a registrarse solos.",
+          solucion: "Se conectó la central a la UPS y se configuró a los teléfonos para volver a registrarse cada 5 minutos.",
+          resolverTickets: false,
+        },
+        "Diego Fuentes",
+        despuesDe(anexos.map((t) => t.resueltoEn!)),
+      );
+    }
+  }
+
   return { equipos: insertados.length, tickets: ids.length };
 }

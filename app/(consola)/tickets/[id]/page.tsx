@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { CheckCircle2Icon, ChevronLeftIcon } from "lucide-react";
 import { obtenerTicket } from "@/lib/datos";
 import { obtenerBD } from "@/lib/db";
-import { NOMBRE_CATEGORIA, NOMBRE_TIPO } from "@/lib/dominio";
+import { NOMBRE_CATEGORIA, NOMBRE_TIPO, estaPendiente } from "@/lib/dominio";
 import { formatearConDia, formatearFechaHora } from "@/lib/formato";
 import { TEXTO_HORARIO } from "@/lib/horario";
 import { EstadoTicket, EtiquetaInventario, Folio, Plazo, PrioridadTicket } from "@/app/_componentes/Insignias";
@@ -13,6 +13,8 @@ import AccionesEstado from "./AccionesEstado";
 import Asignacion from "./Asignacion";
 import Comentar from "./Comentar";
 import Historial from "./Historial";
+import Relacionados from "./Relacionados";
+import { duplicadosDe, listarProblemas, obtenerProblema } from "@/lib/relacionados";
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<Parametros> };
 
@@ -31,6 +33,12 @@ export default async function PaginaTicket({ params, searchParams }: Props) {
   const d = await cargar((await params).id);
   if (!d) notFound();
   const { ticket: t, equipo, eventos } = d;
+  const bd = await obtenerBD();
+  const [duplicados, problema, abiertos] = await Promise.all([
+    duplicadosDe(bd, t.id),
+    t.problemaId ? obtenerProblema(bd, t.problemaId) : null,
+    listarProblemas(bd, true),
+  ]);
   const creado = texto(await searchParams, "creado") === "1";
   const ahora = new Date();
 
@@ -96,6 +104,20 @@ export default async function PaginaTicket({ params, searchParams }: Props) {
               Asignación
             </h2>
             <Asignacion id={t.id} tecnico={t.tecnico} prioridad={t.prioridad} />
+          </section>
+
+          <section aria-labelledby="titulo-relacionados" className="rounded-lg border border-border bg-card p-5">
+            <h2 id="titulo-relacionados" className="text-lg font-bold">
+              Relacionados
+            </h2>
+            <Relacionados
+              id={t.id}
+              pendiente={estaPendiente(t.estado)}
+              duplicadoDe={t.duplicadoDe}
+              duplicados={duplicados}
+              problema={problema ? { id: problema.problema.id, titulo: problema.problema.titulo, estado: problema.problema.estado } : null}
+              problemasAbiertos={abiertos.map((p) => ({ id: p.id, titulo: p.titulo }))}
+            />
           </section>
 
           <section aria-labelledby="titulo-datos" className="rounded-lg border border-border bg-card p-5">

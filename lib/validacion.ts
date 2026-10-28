@@ -125,3 +125,24 @@ export function valores(form: FormData): Record<string, string> {
   for (const [k, v] of form.entries()) if (typeof v === "string") r[k] = v;
   return r;
 }
+
+export const esquemaProblema = z.object({
+  titulo: obligatorio("el título", 5, 120),
+  descripcion: opcional.pipe(z.string().max(4000, "Máximo 4000 caracteres.").nullable()),
+});
+
+export const esquemaResolverProblema = z.object({
+  causa: obligatorio("la causa", 5, 2000),
+  solucion: obligatorio("la solución", 5, 4000),
+  resolverTickets: z
+    .string()
+    .optional()
+    .transform((s) => s === "on"),
+});
+
+/** Un folio escrito como «12» o «#12». */
+export const esquemaFolio = z
+  .string({ error: "Escribe el número del ticket." })
+  .trim()
+  .regex(/^#?\d+$/, "Escribe el número del ticket, por ejemplo 12.")
+  .transform((s) => Number(s.replace("#", "")));

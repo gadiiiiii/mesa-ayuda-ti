@@ -55,6 +55,15 @@ Los técnicos eligen en cada comentario si es una **nota interna** o una **respu
 
 Cada categoría tiene una **regla de asignación** para los tickets nuevos, vengan de la mesa o del portal: dejarlos en la cola, darlos siempre a un especialista (por ejemplo, redes y telefonía a Diego) o al técnico disponible con menos pendientes. Quien está de vacaciones o con licencia se marca como no disponible: no recibe tickets nuevos y los de su especialidad se reparten entre los demás. El historial muestra «Se asignó automáticamente a…».
 
+### Tickets relacionados: duplicados y problemas
+
+Como en ITIL, un ticket puede ser:
+
+- **Duplicado** de otro: se cierra explicándole al solicitante que su caso se atiende en el ticket original, y el original muestra sus duplicados. Si se marca como duplicado de un duplicado, apunta al original.
+- Parte de un **problema**: la causa común de varios tickets («Los teléfonos IP pierden el registro en la central»). El problema reúne a los tickets afectados, guarda la causa y la solución, y al resolverlo puede **resolver de una vez todos sus tickets pendientes** con esa solución, que cada solicitante ve en el portal. Mientras está abierto, el portal avisa que hay más personas con el mismo problema.
+
+Los problemas abiertos aparecen en el panel.
+
 ### Inventario
 
 Equipos con código de inventario correlativo por tipo (`NB-0007`, `IMP-0012`, `SW-0002`…), marca, modelo, serie, unidad, responsable, estado (en uso, en bodega, en reparación, de baja), IP y MAC. La IP y la MAC se validan y se normalizan: la MAC se acepta con dos puntos, guiones o en formato Cisco (`001a.2b3c.4d5e`). La ficha de cada equipo muestra todos sus tickets y permite crear uno nuevo ya asociado.
@@ -84,6 +93,7 @@ Arriba a la derecha se elige **como qué técnico actúas** (se guarda en una co
   - [`lib/dominio.ts`](lib/dominio.ts): estados y cambios permitidos, plazos, códigos de inventario.
   - [`lib/horario.ts`](lib/horario.ts): tiempo hábil en la hora de Chile (con su cambio de horario), con los feriados de [`lib/feriados.ts`](lib/feriados.ts).
   - [`lib/datos.ts`](lib/datos.ts): consultas y cambios en la base, cada cambio de estado en una transacción junto a su registro en el historial.
+  - [`lib/relacionados.ts`](lib/relacionados.ts): duplicados y problemas.
   - [`lib/semilla.ts`](lib/semilla.ts): datos de ejemplo reproducibles, con fechas relativas a hoy.
 - **Tests con [Vitest](https://vitest.dev)**, contra un Postgres real en memoria (PGlite): ciclo de vida completo de un ticket, cambios no permitidos, filtros y búsqueda, códigos de inventario y datos de ejemplo. El calendario hábil se prueba con viernes, fines de semana, Navidad, cambio de horario y la ida y vuelta entre sumar y medir tiempo hábil.
 - GitHub Actions corre los tests y el build en cada push.
@@ -111,7 +121,7 @@ Para cambiar el esquema: edita `lib/db/esquema.ts` y genera la migración con `n
 - [x] Plazos en horas hábiles, con feriados y pausa mientras el ticket está en espera.
 - [x] Portal para que cualquier funcionario pida ayuda y siga su ticket con un código.
 - [x] «Mis tickets» y asignación automática por categoría, carga y disponibilidad.
-- [ ] Tickets relacionados: duplicados y problemas que agrupan varios tickets.
+- [x] Tickets relacionados: duplicados y problemas que agrupan varios tickets y se resuelven juntos.
 - [ ] Base de conocimiento y respuestas predefinidas.
 - [ ] Métricas de tiempos y encuesta de satisfacción.
 - [ ] Inventario con garantía, historial de cambios y mantenciones.

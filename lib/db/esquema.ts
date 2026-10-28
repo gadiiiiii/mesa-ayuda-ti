@@ -1,4 +1,4 @@
-import { boolean, date, index, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, date, index, integer, pgTable, serial, text, timestamp, type AnyPgColumn } from "drizzle-orm/pg-core";
 import type { Categoria, Estado, EstadoEquipo, ModoAsignacion, Prioridad, TipoEquipo } from "../dominio";
 
 const momento = (nombre: string) => timestamp(nombre, { withTimezone: true, mode: "date" });
@@ -25,6 +25,22 @@ export const equipos = pgTable(
   (t) => [index("equipos_unidad_idx").on(t.unidad)],
 );
 
+/**
+ * Un problema (en el sentido de ITIL): la causa común de varios tickets, por ejemplo «se cae el
+ * switch de Obras». Se investiga y se resuelve una vez, y con él se pueden resolver todos sus tickets.
+ */
+export const problemas = pgTable("problemas", {
+  id: serial("id").primaryKey(),
+  titulo: text("titulo").notNull(),
+  descripcion: text("descripcion"),
+  estado: text("estado").$type<"abierto" | "resuelto">().notNull().default("abierto"),
+  causa: text("causa"),
+  solucion: text("solucion"),
+  autor: text("autor").notNull(),
+  creadoEn: momento("creado_en").notNull().defaultNow(),
+  resueltoEn: momento("resuelto_en"),
+});
+
 export const tickets = pgTable(
   "tickets",
   {
@@ -50,11 +66,14 @@ export const tickets = pgTable(
     origen: text("origen").$type<"mesa" | "portal">().notNull().default("mesa"),
     /** Código para que el solicitante siga su ticket en el portal sin iniciar sesión (ABCD-2345). */
     codigo: text("codigo").unique(),
+    /** Si se cerró por ser el mismo caso que otro ticket. */
+    duplicadoDe: integer("duplicado_de").references((): AnyPgColumn => tickets.id, { onDelete: "set null" }),
+    problemaId: integer("problema_id").references(() => problemas.id, { onDelete: "set null" }),
   },
   (t) => [index("tickets_estado_idx").on(t.estado), index("tickets_equipo_idx").on(t.equipoId)],
 );
 
-export type TipoEvento = "creado" | "comentario" | "estado" | "asignacion" | "prioridad";
+export type TipoEvento = "creado" | "comentario" | "estado" | "asignacion" | "prioridad" | "relacion";
 
 /** Historial de un ticket: comentarios y cada cambio de estado, prioridad o técnico. */
 export const eventos = pgTable(
@@ -93,3 +112,4 @@ export const tecnicos = pgTable("tecnicos", {
 export type Equipo = typeof equipos.$inferSelect;
 export type Ticket = typeof tickets.$inferSelect;
 export type Evento = typeof eventos.$inferSelect;
+export type Problema = typeof problemas.$inferSelect;

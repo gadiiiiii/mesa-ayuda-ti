@@ -29,6 +29,13 @@
       "when": 1793201616041,
       "tag": "0003_asignacion",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793201947908,
+      "tag": "0004_relacionados",
+      "breakpoints": true
     }
   ]
 }
