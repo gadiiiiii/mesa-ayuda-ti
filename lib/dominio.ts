@@ -339,6 +339,17 @@ export const REGLAS_INICIALES: Record<Categoria, Regla> = {
 /** Autor de los eventos que registra el sistema solo. */
 export const AUTOR_SISTEMA = "Asignación automática";
 
+/** Sugerencias para el tipo de mantención (se puede escribir otro). */
+export const TIPOS_MANTENCION = [
+  "Limpieza",
+  "Cambio de tóner",
+  "Revisión general",
+  "Actualización de software",
+  "Actualización de firmware",
+];
+
+export type EstadoMantencion = "vencida" | "proxima" | "programada" | "realizada";
+
 export const esUno =
   <T extends string>(lista: readonly T[]) =>
   (x: unknown): x is T =>

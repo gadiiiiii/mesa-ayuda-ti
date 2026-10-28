@@ -7,6 +7,7 @@ import {
   ClockIcon,
   PauseCircleIcon,
   PauseIcon,
+  ShieldAlertIcon,
 } from "lucide-react";
 import {
   NOMBRE_ESTADO,
@@ -19,6 +20,8 @@ import {
   type EstadoEquipo,
   type Prioridad,
 } from "@/lib/dominio";
+import { formatearFecha } from "@/lib/formato";
+import { estadoGarantia } from "@/lib/fechas";
 import { cn } from "@/lib/utils";
 
 const ICONO_ESTADO = {
@@ -135,4 +138,19 @@ const COLOR_EQUIPO: Record<EstadoEquipo, string> = {
 
 export function EstadoEquipoTexto({ estado }: { estado: EstadoEquipo }) {
   return <span className={cn("whitespace-nowrap", COLOR_EQUIPO[estado])}>{NOMBRE_ESTADO_EQUIPO[estado]}</span>;
+}
+
+/** Garantía: «Vigente hasta…», «Vence en 34 días» (ámbar) o «Vencida el…». */
+export function Garantia({ hasta, hoy, corta = false }: { hasta: string | null; hoy: string; corta?: boolean }) {
+  const g = estadoGarantia(hasta, hoy);
+  if (g.estado === "sin_dato") return corta ? null : <span className="text-muted-foreground">Sin dato</span>;
+  if (g.estado === "vigente") return corta ? null : <span>Vigente hasta el {formatearFecha(hasta!)}</span>;
+  if (g.estado === "por_vencer")
+    return (
+      <span className="inline-flex items-center gap-1 font-semibold text-warning">
+        <ShieldAlertIcon className="size-3.5 shrink-0" aria-hidden="true" />
+        Garantía vence {g.dias === 0 ? "hoy" : g.dias === 1 ? "mañana" : `en ${g.dias} días`}
+      </span>
+    );
+  return <span className="text-muted-foreground">{corta ? "Garantía vencida" : `Vencida el ${formatearFecha(hasta!)}`}</span>;
 }

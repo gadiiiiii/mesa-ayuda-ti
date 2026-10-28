@@ -105,6 +105,7 @@ export const esquemaEquipo = z.object({
     return mac;
   }),
   fechaCompra: fecha,
+  garantiaHasta: fecha,
   notas: opcional.pipe(z.string().max(2000, "Máximo 2000 caracteres.").nullable()),
 });
 export type EquipoDatos = z.infer<typeof esquemaEquipo>;
@@ -160,4 +161,17 @@ export const esquemaArticulo = z.object({
 export const esquemaRespuesta = z.object({
   titulo: obligatorio("el nombre", 3, 60),
   texto: obligatorio("el texto", 5, 2000),
+});
+
+export const esquemaMantencion = z.object({
+  tipo: obligatorio("el tipo de mantención", 3, 60),
+  programadaPara: z.string({ error: "Elige la fecha." }).regex(/^\d{4}-\d{2}-\d{2}$/, "Elige la fecha."),
+  cadaMeses: opcional.pipe(
+    z
+      .string()
+      .regex(/^\d+$/, "Escribe un número de meses.")
+      .transform(Number)
+      .refine((n) => n >= 1 && n <= 36, "Entre 1 y 36 meses.")
+      .nullable(),
+  ),
 });

@@ -123,6 +123,17 @@ export default function FormularioEquipo({ id, codigo, inicial }: { id?: number;
         </Campo>
       </div>
 
+      <Campo
+        id="garantiaHasta"
+        etiqueta="Garantía hasta"
+        opcional
+        ayuda="Último día de la garantía del proveedor. Avisamos cuando quedan 60 días o menos."
+        error={e.garantiaHasta}
+        className="sm:max-w-[calc(50%-0.625rem)]"
+      >
+        {(p) => <Input {...p} type="date" defaultValue={v.garantiaHasta} />}
+      </Campo>
+
       <div className="grid gap-5 sm:grid-cols-2">
         <Campo
           id="ip"

@@ -50,6 +50,13 @@
       "when": 1793202979501,
       "tag": "0006_encuestas",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793203580136,
+      "tag": "0007_inventario_completo",
+      "breakpoints": true
     }
   ]
 }

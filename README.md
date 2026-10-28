@@ -81,6 +81,12 @@ Los problemas abiertos aparecen en el panel.
 
 Equipos con código de inventario correlativo por tipo (`NB-0007`, `IMP-0012`, `SW-0002`…), marca, modelo, serie, unidad, responsable, estado (en uso, en bodega, en reparación, de baja), IP y MAC. La IP y la MAC se validan y se normalizan: la MAC se acepta con dos puntos, guiones o en formato Cisco (`001a.2b3c.4d5e`). La ficha de cada equipo muestra todos sus tickets y permite crear uno nuevo ya asociado.
 
+Como en GLPI, además:
+
+- **Garantía:** fecha de término, aviso cuando quedan 60 días o menos y filtro de garantías por vencer o vencidas. Si un ticket es de un equipo en garantía, la ficha del ticket recuerda consultar al proveedor antes de repararlo.
+- **Historial del equipo:** su alta y cada traslado de unidad, cambio de responsable, de estado o de IP, con fecha y técnico.
+- **Mantenciones preventivas:** limpiezas, cambios de tóner o revisiones programadas por equipo, con una agenda de atrasadas y próximas. Las periódicas se vuelven a programar solas al registrarlas.
+
 ### Panel
 
 Pendientes, vencidos, por vencer, sin asignar, resueltos en la semana y el porcentaje resuelto dentro del plazo en los últimos 30 días. Debajo, los tickets que requieren atención y gráficos de pendientes por categoría, carga por técnico y estado del inventario.
@@ -90,6 +96,8 @@ Pendientes, vencidos, por vencer, sin asignar, resueltos en la semana y el porce
 Arriba a la derecha se elige **como qué técnico actúas** (se guarda en una cookie). Ese nombre queda en el historial de lo que hagas.
 
 ![Ficha de un ticket con su historial](docs/ticket.png)
+
+![Métricas del último mes](docs/metricas.png)
 
 ## Cómo está hecho
 
@@ -109,6 +117,7 @@ Arriba a la derecha se elige **como qué técnico actúas** (se guarda en una co
   - [`lib/relacionados.ts`](lib/relacionados.ts): duplicados y problemas.
   - [`lib/conocimiento.ts`](lib/conocimiento.ts): búsqueda de artículos y respuestas predefinidas.
   - [`lib/metricas.ts`](lib/metricas.ts): cálculo de métricas, encuesta y exportación a CSV.
+  - [`lib/inventario.ts`](lib/inventario.ts): historial de equipos y mantenciones; fechas de garantía en [`lib/fechas.ts`](lib/fechas.ts).
   - [`lib/semilla.ts`](lib/semilla.ts): datos de ejemplo reproducibles, con fechas relativas a hoy.
 - **Tests con [Vitest](https://vitest.dev)**, contra un Postgres real en memoria (PGlite): ciclo de vida completo de un ticket, cambios no permitidos, filtros y búsqueda, códigos de inventario y datos de ejemplo. El calendario hábil se prueba con viernes, fines de semana, Navidad, cambio de horario y la ida y vuelta entre sumar y medir tiempo hábil.
 - GitHub Actions corre los tests y el build en cada push.
@@ -139,7 +148,7 @@ Para cambiar el esquema: edita `lib/db/esquema.ts` y genera la migración con `n
 - [x] Tickets relacionados: duplicados y problemas que agrupan varios tickets y se resuelven juntos.
 - [x] Base de conocimiento con búsqueda en español, sugerencias en el portal y respuestas predefinidas.
 - [x] Métricas de tiempos, encuesta de satisfacción y exportación a Excel.
-- [ ] Inventario con garantía, historial de cambios y mantenciones.
+- [x] Inventario con garantía, historial de cambios y mantenciones preventivas.
 - [ ] Inicio de sesión con roles (quien pide ayuda y técnico).
 - [ ] Avisos por correo al solicitante cuando su ticket se resuelve.
 - [ ] Adjuntar capturas de pantalla a un ticket.

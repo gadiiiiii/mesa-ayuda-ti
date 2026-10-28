@@ -6,8 +6,9 @@ import { obtenerTicket } from "@/lib/datos";
 import { obtenerBD } from "@/lib/db";
 import { NOMBRE_CATEGORIA, NOMBRE_TIPO, estaPendiente } from "@/lib/dominio";
 import { formatearConDia, formatearFechaHora } from "@/lib/formato";
-import { TEXTO_HORARIO } from "@/lib/horario";
-import { EstadoTicket, EtiquetaInventario, Folio, Plazo, PrioridadTicket } from "@/app/_componentes/Insignias";
+import { estadoGarantia } from "@/lib/fechas";
+import { TEXTO_HORARIO, aLocal } from "@/lib/horario";
+import { EstadoTicket, EtiquetaInventario, Folio, Garantia, Plazo, PrioridadTicket } from "@/app/_componentes/Insignias";
 import { texto, type Parametros } from "@/app/_componentes/parametros";
 import AccionesEstado from "./AccionesEstado";
 import Asignacion from "./Asignacion";
@@ -53,6 +54,7 @@ export default async function PaginaTicket({ params, searchParams }: Props) {
   }));
   const creado = texto(await searchParams, "creado") === "1";
   const ahora = new Date();
+  const hoy = aLocal(ahora).fecha;
 
   return (
     <>
@@ -199,6 +201,17 @@ export default async function PaginaTicket({ params, searchParams }: Props) {
                   <span className="text-muted-foreground">Ninguno</span>
                 )}
               </dd>
+              {equipo && estadoGarantia(equipo.garantiaHasta, hoy).estado !== "sin_dato" && (
+                <>
+                  <dt className="text-muted-foreground">Garantía</dt>
+                  <dd>
+                    <Garantia hasta={equipo.garantiaHasta} hoy={hoy} />
+                    {estadoGarantia(equipo.garantiaHasta, hoy).estado !== "vencida" && (
+                      <span className="block text-muted-foreground">Antes de repararlo, consulta al proveedor.</span>
+                    )}
+                  </dd>
+                </>
+              )}
             </dl>
             <p className="mt-4 border-t border-border pt-3 text-sm text-muted-foreground">
               El plazo corre {TEXTO_HORARIO}, y se detiene mientras el ticket está en espera.

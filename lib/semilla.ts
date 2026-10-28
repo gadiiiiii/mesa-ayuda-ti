@@ -3,7 +3,8 @@ import { sembrarConocimiento } from "./conocimientoSemilla";
 import type { BD } from "./db";
 import { crearProblema, marcarDuplicado, resolverProblema, vincularProblema } from "./relacionados";
 import { aLocal, desdeLocal, habilesEntre, sumarDia, sumarHabiles, ventana } from "./horario";
-import { encuestas, equipos, eventos, reglasAsignacion, tecnicos, tickets } from "./db/esquema";
+import { encuestas, equipos, eventos, mantenciones, movimientos, reglasAsignacion, tecnicos, tickets } from "./db/esquema";
+import { sumarMeses } from "./inventario";
 import {
   HORAS_PLAZO,
   PREFIJO_TIPO,
@@ -305,6 +306,14 @@ const MOTIVOS_CIERRE = ["Duplicado de otro ticket.", "El solicitante indica que 
 
 const HORA = 3_600_000;
 
+/** El mediodía de una fecha AAAA-MM-DD en Chile, sin pasar de `ahora`. */
+function momentoHabilEn(fecha: string, ahora: Date): Date {
+  const d = desdeLocal(fecha, 12 * HORA);
+  return d > ahora ? ahora : d;
+}
+
+const persona2 = (az: ReturnType<typeof crearAzar>) => `${az.elegir(NOMBRES)} ${az.elegir(APELLIDOS)}`;
+
 /** Un momento en horario de oficina de hace `diasAtras` días (o del día hábil anterior), nunca después de `ahora`. */
 function momentoHabil(az: ReturnType<typeof crearAzar>, ahora: Date, diasAtras: number): Date {
   const hoy = aLocal(ahora);
@@ -392,10 +401,84 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
     e.creadoEn = new Date(ahora.getTime() - 60 * 24 * HORA);
     e.actualizadoEn = e.creadoEn;
   }
+  // Garantías y mantenciones usan su propio generador, para no cambiar los tickets de ejemplo.
+  const az2 = crearAzar(20261029);
+  const hoy = aLocal(ahora).fecha;
+  for (const e of lista) {
+    if (e.fechaCompra) e.garantiaHasta = sumarMeses(e.fechaCompra, az2.elegir([12, 24, 36, 36]));
+  }
+  // Un par de garantías a punto de vencer, para que se note el aviso.
+  for (const e of lista.filter((x) => x.tipo === "notebook" || x.tipo === "impresora").slice(0, 2)) {
+    e.garantiaHasta = sumarDia(hoy, az2.entero(15, 50));
+  }
   const insertados = await bd
     .insert(equipos)
     .values(lista)
     .returning({ id: equipos.id, tipo: equipos.tipo, unidad: equipos.unidad, responsable: equipos.responsable, estado: equipos.estado });
+
+  // Historial: el alta de cada equipo y algunos cambios de responsable, de unidad o de estado.
+  const historial: (typeof movimientos.$inferInsert)[] = insertados.map((e) => ({
+    equipoId: e.id,
+    campo: "alta",
+    hacia: e.unidad,
+    autor: "Diego Fuentes",
+    creadoEn: new Date(ahora.getTime() - 60 * 24 * HORA),
+  }));
+  for (const e of insertados) {
+    const cuando = momentoHabil(az2, ahora, az2.entero(5, 50));
+    const autor = az2.elegir(TECNICOS);
+    if (e.estado !== "en_uso")
+      historial.push({ equipoId: e.id, campo: "estado", desde: "en_uso", hacia: e.estado, autor, creadoEn: cuando });
+    else if (e.responsable && az2.siguiente() < 0.15) {
+      historial.push({ equipoId: e.id, campo: "responsable", desde: persona2(az2), hacia: e.responsable, autor, creadoEn: cuando });
+    } else if (az2.siguiente() < 0.06) {
+      historial.push({
+        equipoId: e.id,
+        campo: "unidad",
+        desde: az2.elegir(UNIDADES.filter((u) => u !== e.unidad)),
+        hacia: e.unidad,
+        autor,
+        creadoEn: cuando,
+      });
+    }
+  }
+  await bd.insert(movimientos).values(historial);
+
+  // Mantenciones: limpieza de impresoras cada 6 meses, revisión anual de la red, limpieza anual de algunos PC.
+  const agenda: (typeof mantenciones.$inferInsert)[] = [];
+  for (const e of insertados.filter((x) => x.estado !== "de_baja")) {
+    const plan =
+      e.tipo === "impresora"
+        ? { tipo: "Limpieza", meses: 6 }
+        : e.tipo === "switch" || e.tipo === "router" || e.tipo === "access_point"
+          ? { tipo: "Revisión general", meses: 12 }
+          : e.tipo === "escritorio" && az2.siguiente() < 0.35
+            ? { tipo: "Limpieza", meses: 12 }
+            : null;
+    if (!plan) continue;
+    const ultima = sumarDia(hoy, -az2.entero(30 * plan.meses - 40, 30 * plan.meses + 15));
+    const autor = az2.elegir(TECNICOS);
+    agenda.push({
+      equipoId: e.id,
+      tipo: plan.tipo,
+      programadaPara: ultima,
+      cadaMeses: plan.meses,
+      realizadaEn: momentoHabilEn(ultima, ahora),
+      realizadaPor: autor,
+      nota: plan.tipo === "Limpieza" ? "Sin observaciones." : "Firmware al día; puertos sin errores.",
+      creadaPor: autor,
+      creadoEn: new Date(ahora.getTime() - 400 * 24 * HORA),
+    });
+    agenda.push({
+      equipoId: e.id,
+      tipo: plan.tipo,
+      programadaPara: sumarMeses(ultima, plan.meses),
+      cadaMeses: plan.meses,
+      creadaPor: autor,
+      creadoEn: momentoHabilEn(ultima, ahora),
+    });
+  }
+  if (agenda.length) await bd.insert(mantenciones).values(agenda);
 
   // ── Tickets ──
   type Fila = { ticket: typeof tickets.$inferInsert; eventos: Omit<typeof eventos.$inferInsert, "ticketId">[] };

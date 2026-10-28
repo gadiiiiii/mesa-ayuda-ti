@@ -6,8 +6,12 @@ import { Button } from "@/components/ui/button";
 import { obtenerEquipo } from "@/lib/datos";
 import { obtenerBD } from "@/lib/db";
 import { NOMBRE_TIPO, estaPendiente } from "@/lib/dominio";
-import { formatearFecha } from "@/lib/formato";
-import { EstadoEquipoTexto, EtiquetaInventario } from "@/app/_componentes/Insignias";
+import { formatearFecha, formatearFechaHora } from "@/lib/formato";
+import { aLocal } from "@/lib/horario";
+import { estadoMantencion, listarMovimientos, mantencionesDeEquipo } from "@/lib/inventario";
+import HistorialEquipo from "./HistorialEquipo";
+import Mantenciones from "./Mantenciones";
+import { EstadoEquipoTexto, EtiquetaInventario, Garantia } from "@/app/_componentes/Insignias";
 import TablaTickets from "@/app/_componentes/TablaTickets";
 import { texto, type Parametros } from "@/app/_componentes/parametros";
 
@@ -37,6 +41,9 @@ export default async function PaginaEquipo({ params, searchParams }: Props) {
         : null;
   const pendientes = tickets.filter((t) => estaPendiente(t.estado)).length;
   const ahora = new Date();
+  const hoy = aLocal(ahora).fecha;
+  const bd = await obtenerBD();
+  const [historial, mantencionesEquipo] = await Promise.all([listarMovimientos(bd, e.id), mantencionesDeEquipo(bd, e.id)]);
 
   const fila = (etiqueta: string, valor: React.ReactNode, mono = false) => (
     <>
@@ -98,21 +105,45 @@ export default async function PaginaEquipo({ params, searchParams }: Props) {
             {fila("IP", e.ip, true)}
             {fila("MAC", e.mac, true)}
             {fila("Compra", e.fechaCompra ? formatearFecha(e.fechaCompra) : null)}
+            {fila("Garantía", e.garantiaHasta ? <Garantia hasta={e.garantiaHasta} hoy={hoy} /> : null)}
           </dl>
           {e.notas && <p className="mt-4 border-t border-border pt-3 text-sm whitespace-pre-line">{e.notas}</p>}
+          <HistorialEquipo movimientos={historial} ahora={ahora} />
         </section>
 
-        <section aria-labelledby="titulo-tickets-equipo">
-          <h2 id="titulo-tickets-equipo" className="text-lg font-bold">
-            Tickets de este equipo
-          </h2>
-          <p className="mt-1 mb-3 text-sm text-muted-foreground">
-            {tickets.length === 0
-              ? "Este equipo no ha tenido tickets."
-              : `${tickets.length} en total, ${pendientes === 1 ? "1 pendiente" : `${pendientes} pendientes`}.`}
-          </p>
-          {tickets.length > 0 && <TablaTickets filas={tickets} ahora={ahora} sinEquipo />}
-        </section>
+        <div className="flex min-w-0 flex-col gap-8">
+          <section aria-labelledby="titulo-mantenciones" className="rounded-lg border border-border bg-card p-5">
+            <h2 id="titulo-mantenciones" className="text-lg font-bold">
+              Mantenciones
+            </h2>
+            <Mantenciones
+              equipoId={e.id}
+              deBaja={e.estado === "de_baja"}
+              hoy={hoy}
+              mantenciones={mantencionesEquipo.map((m) => ({
+                id: m.id,
+                tipo: m.tipo,
+                programadaPara: m.programadaPara,
+                cadaMeses: m.cadaMeses,
+                realizada: m.realizadaEn ? `${formatearFechaHora(m.realizadaEn, ahora)}, ${m.realizadaPor}` : null,
+                nota: m.nota,
+                estado: estadoMantencion(m, hoy),
+              }))}
+            />
+          </section>
+
+          <section aria-labelledby="titulo-tickets-equipo">
+            <h2 id="titulo-tickets-equipo" className="text-lg font-bold">
+              Tickets de este equipo
+            </h2>
+            <p className="mt-1 mb-3 text-sm text-muted-foreground">
+              {tickets.length === 0
+                ? "Este equipo no ha tenido tickets."
+                : `${tickets.length} en total, ${pendientes === 1 ? "1 pendiente" : `${pendientes} pendientes`}.`}
+            </p>
+            {tickets.length > 0 && <TablaTickets filas={tickets} ahora={ahora} sinEquipo />}
+          </section>
+        </div>
       </div>
     </>
   );

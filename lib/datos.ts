@@ -1,8 +1,11 @@
-import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, like, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, like, lt, lte, ne, or, sql, type SQL } from "drizzle-orm";
+import { sumarDia } from "./horario";
 import type { BD } from "./db";
 import {
   articulos,
   encuestas,
+  mantenciones,
+  movimientos,
   equipos,
   eventos,
   problemas,
@@ -37,6 +40,7 @@ import {
   type TipoEquipo,
 } from "./dominio";
 import { nuevoCodigo } from "./codigo";
+import { CAMPOS_HISTORIAL } from "./inventario";
 import type { EquipoDatos, Solicitud, TicketNuevo } from "./validacion";
 
 export type Resultado<T = void> = { ok: true; valor: T } | { ok: false; error: string };
@@ -434,9 +438,14 @@ export interface FiltrosEquipos {
   estado?: EstadoEquipo;
   unidad?: string;
   q?: string;
+  /** Con la fecha de hoy (AAAA-MM-DD): garantía vencida o que vence en 60 días o menos. */
+  garantia?: { estado: "por_vencer" | "vencida"; hoy: string };
 }
 
-export type FilaEquipo = Pick<Equipo, "id" | "codigo" | "tipo" | "marca" | "modelo" | "unidad" | "responsable" | "estado" | "ip"> & {
+export type FilaEquipo = Pick<
+  Equipo,
+  "id" | "codigo" | "tipo" | "marca" | "modelo" | "unidad" | "responsable" | "estado" | "ip" | "garantiaHasta"
+> & {
   pendientes: number;
 };
 
@@ -445,6 +454,9 @@ export async function listarEquipos(bd: BD, f: FiltrosEquipos = {}): Promise<Fil
   if (f.tipo) c.push(eq(equipos.tipo, f.tipo));
   if (f.estado) c.push(eq(equipos.estado, f.estado));
   if (f.unidad) c.push(eq(equipos.unidad, f.unidad));
+  if (f.garantia?.estado === "vencida") c.push(lt(equipos.garantiaHasta, f.garantia.hoy));
+  if (f.garantia?.estado === "por_vencer")
+    c.push(and(gte(equipos.garantiaHasta, f.garantia.hoy), lte(equipos.garantiaHasta, sumarDia(f.garantia.hoy, 60)))!);
   const q = f.q?.trim();
   if (q) {
     const patron = `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
@@ -476,6 +488,7 @@ export async function listarEquipos(bd: BD, f: FiltrosEquipos = {}): Promise<Fil
       responsable: equipos.responsable,
       estado: equipos.estado,
       ip: equipos.ip,
+      garantiaHasta: equipos.garantiaHasta,
       pendientes: pendientes.n,
     })
     .from(equipos)
@@ -508,7 +521,7 @@ export async function equiposParaElegir(bd: BD) {
     .orderBy(asc(equipos.unidad), asc(equipos.codigo));
 }
 
-export async function crearEquipo(bd: BD, datos: EquipoDatos, ahora: Date): Promise<Resultado<number>> {
+export async function crearEquipo(bd: BD, datos: EquipoDatos, ahora: Date, autor = "Inventario"): Promise<Resultado<number>> {
   // Dos altas al mismo tiempo podrían elegir el mismo código: el índice único lo impide y se reintenta.
   for (let intento = 0; intento < 3; intento++) {
     const prefijo = PREFIJO_TIPO[datos.tipo];
@@ -525,6 +538,7 @@ export async function crearEquipo(bd: BD, datos: EquipoDatos, ahora: Date): Prom
         .insert(equipos)
         .values({ ...datos, codigo, creadoEn: ahora, actualizadoEn: ahora })
         .returning({ id: equipos.id });
+      await bd.insert(movimientos).values({ equipoId: e.id, campo: "alta", hacia: datos.unidad, autor, creadoEn: ahora });
       return bien(e.id);
     } catch (err) {
       if (!String((err as { cause?: unknown })?.cause ?? err).includes("equipos_codigo_unique")) throw err;
@@ -534,13 +548,32 @@ export async function crearEquipo(bd: BD, datos: EquipoDatos, ahora: Date): Prom
 }
 
 /** El tipo no cambia al editar: el código de inventario depende de él. */
-export async function actualizarEquipo(bd: BD, id: number, datos: Omit<EquipoDatos, "tipo">, ahora: Date): Promise<Resultado> {
-  const r = await bd
-    .update(equipos)
-    .set({ ...datos, actualizadoEn: ahora })
-    .where(eq(equipos.id, id))
-    .returning({ id: equipos.id });
-  return r.length ? bien(undefined) : mal("El equipo no existe.");
+export async function actualizarEquipo(
+  bd: BD,
+  id: number,
+  datos: Omit<EquipoDatos, "tipo">,
+  ahora: Date,
+  autor = "Inventario",
+): Promise<Resultado> {
+  const [antes] = await bd.select().from(equipos).where(eq(equipos.id, id));
+  if (!antes) return mal("El equipo no existe.");
+  // Lo que cambió de unidad, responsable, estado o IP queda en el historial del equipo.
+  const cambios = CAMPOS_HISTORIAL.filter((c) => (antes[c] ?? null) !== (datos[c] ?? null)).map((c) => ({
+    equipoId: id,
+    campo: c,
+    desde: antes[c],
+    hacia: datos[c],
+    autor,
+    creadoEn: ahora,
+  }));
+  await bd.transaction(async (tx) => {
+    await tx
+      .update(equipos)
+      .set({ ...datos, actualizadoEn: ahora })
+      .where(eq(equipos.id, id));
+    if (cambios.length) await tx.insert(movimientos).values(cambios);
+  });
+  return bien(undefined);
 }
 
 // ── Panel ──────────────────────────────────────────────────────────────────
@@ -606,6 +639,6 @@ export async function resumen(bd: BD, ahora: Date): Promise<Resumen> {
 /** Borra todo (y reinicia los números de ticket). Lo usa el botón de restablecer la demo. */
 export async function vaciar(bd: BD): Promise<void> {
   await bd.execute(
-    sql`TRUNCATE ${eventos}, ${tickets}, ${equipos}, ${reglasAsignacion}, ${tecnicos}, ${problemas}, ${articulos}, ${respuestas}, ${encuestas} RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE ${eventos}, ${tickets}, ${equipos}, ${reglasAsignacion}, ${tecnicos}, ${problemas}, ${articulos}, ${respuestas}, ${encuestas}, ${movimientos}, ${mantenciones} RESTART IDENTITY CASCADE`,
   );
 }

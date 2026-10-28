@@ -20,6 +20,8 @@ import { obtenerBD } from "@/lib/db";
 import { CATEGORIAS, MODOS_ASIGNACION, esTecnico, type Categoria, type ModoAsignacion, type Regla } from "@/lib/dominio";
 import { normalizarCodigo } from "@/lib/codigo";
 import { responderEncuesta } from "@/lib/metricas";
+import { eliminarMantencion, programarMantencion, realizarMantencion } from "@/lib/inventario";
+import { aLocal } from "@/lib/horario";
 import {
   actualizarArticulo,
   crearArticulo,
@@ -39,6 +41,7 @@ import {
   esquemaComentario,
   esquemaEquipo,
   esquemaFolio,
+  esquemaMantencion,
   esquemaProblema,
   esquemaResolverProblema,
   esquemaRespuesta,
@@ -123,11 +126,11 @@ export async function accionGuardarEquipo(_: EstadoFormulario, form: FormData): 
   let destino: number;
   if (id) {
     const { tipo: _tipo, ...resto } = v.data;
-    const r = await actualizarEquipo(bd, id, resto, ahora);
+    const r = await actualizarEquipo(bd, id, resto, ahora, await tecnicoActual());
     if (!r.ok) return { mensaje: r.error, valores: datos, intento: Date.now() };
     destino = id;
   } else {
-    const r = await crearEquipo(bd, v.data, ahora);
+    const r = await crearEquipo(bd, v.data, ahora, await tecnicoActual());
     if (!r.ok) return { mensaje: r.error, valores: datos, intento: Date.now() };
     destino = r.valor;
   }
@@ -337,4 +340,38 @@ export async function accionResponderEncuesta(_: EstadoFormulario, form: FormDat
   if (!r.ok) return { mensaje: r.error };
   revalidatePath("/", "layout");
   return { ok: Date.now(), mensaje: "¡Gracias por responder!" };
+}
+
+// ── Mantenciones ───────────────────────────────────────────────────────────
+
+export async function accionProgramarMantencion(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const equipoId = idDe(form);
+  const datos = valores(form);
+  const v = esquemaMantencion.safeParse(datos);
+  if (!equipoId) return { mensaje: "Datos no válidos. Recarga la página." };
+  if (!v.success) return { errores: erroresPorCampo(v.error), valores: datos };
+  const r = await programarMantencion(await obtenerBD(), { equipoId, ...v.data }, await tecnicoActual(), new Date());
+  if (!r.ok) return { mensaje: r.error, valores: datos };
+  revalidatePath("/", "layout");
+  return { ok: Date.now(), mensaje: "Mantención programada." };
+}
+
+export async function accionRealizarMantencion(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const id = idDe(form);
+  if (!id) return { mensaje: "Datos no válidos. Recarga la página." };
+  const nota =
+    String(form.get("nota") ?? "")
+      .trim()
+      .slice(0, 1000) || null;
+  const ahora = new Date();
+  const r = await realizarMantencion(await obtenerBD(), id, nota, await tecnicoActual(), ahora, aLocal(ahora).fecha);
+  if (!r.ok) return { mensaje: r.error };
+  revalidatePath("/", "layout");
+  return { ok: Date.now(), mensaje: r.valor.siguiente ? "Registrada. La siguiente quedó programada." : "Mantención registrada." };
+}
+
+export async function accionEliminarMantencion(form: FormData) {
+  const id = idDe(form);
+  if (id) await eliminarMantencion(await obtenerBD(), id);
+  revalidatePath("/", "layout");
 }

@@ -24,6 +24,7 @@ export default async function EditarEquipo({ params }: { params: Promise<{ id: s
       ip: e.ip,
       mac: e.mac,
       fechaCompra: e.fechaCompra,
+      garantiaHasta: e.garantiaHasta,
       notas: e.notas,
     }).map(([k, x]) => [k, x ?? ""]),
   );

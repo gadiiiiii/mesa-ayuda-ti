@@ -19,6 +19,8 @@ export const equipos = pgTable(
     ip: text("ip"),
     mac: text("mac"),
     fechaCompra: date("fecha_compra", { mode: "string" }),
+    /** Último día de la garantía del proveedor. */
+    garantiaHasta: date("garantia_hasta", { mode: "string" }),
     notas: text("notas"),
     creadoEn: momento("creado_en").notNull().defaultNow(),
     actualizadoEn: momento("actualizado_en").notNull().defaultNow(),
@@ -151,6 +153,44 @@ export const encuestas = pgTable("encuestas", {
   creadoEn: momento("creado_en").notNull().defaultNow(),
 });
 
+/** Historial de un equipo: cada cambio de unidad, responsable, estado o IP, y su alta. */
+export const movimientos = pgTable(
+  "movimientos",
+  {
+    id: serial("id").primaryKey(),
+    equipoId: integer("equipo_id")
+      .notNull()
+      .references(() => equipos.id, { onDelete: "cascade" }),
+    /** "alta" o el campo que cambió: unidad, responsable, estado, ip. */
+    campo: text("campo").notNull(),
+    desde: text("desde"),
+    hacia: text("hacia"),
+    autor: text("autor").notNull(),
+    creadoEn: momento("creado_en").notNull().defaultNow(),
+  },
+  (t) => [index("movimientos_equipo_idx").on(t.equipoId)],
+);
+
+/** Mantenciones preventivas programadas y realizadas. Con `cadaMeses`, al realizarla se programa la siguiente. */
+export const mantenciones = pgTable(
+  "mantenciones",
+  {
+    id: serial("id").primaryKey(),
+    equipoId: integer("equipo_id")
+      .notNull()
+      .references(() => equipos.id, { onDelete: "cascade" }),
+    tipo: text("tipo").notNull(),
+    programadaPara: date("programada_para", { mode: "string" }).notNull(),
+    cadaMeses: integer("cada_meses"),
+    realizadaEn: momento("realizada_en"),
+    realizadaPor: text("realizada_por"),
+    nota: text("nota"),
+    creadaPor: text("creada_por").notNull(),
+    creadoEn: momento("creado_en").notNull().defaultNow(),
+  },
+  (t) => [index("mantenciones_equipo_idx").on(t.equipoId)],
+);
+
 export type Equipo = typeof equipos.$inferSelect;
 export type Ticket = typeof tickets.$inferSelect;
 export type Evento = typeof eventos.$inferSelect;
@@ -158,3 +198,5 @@ export type Problema = typeof problemas.$inferSelect;
 export type Articulo = typeof articulos.$inferSelect;
 export type Respuesta = typeof respuestas.$inferSelect;
 export type Encuesta = typeof encuestas.$inferSelect;
+export type Movimiento = typeof movimientos.$inferSelect;
+export type Mantencion = typeof mantenciones.$inferSelect;
