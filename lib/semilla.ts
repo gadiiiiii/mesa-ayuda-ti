@@ -1,4 +1,5 @@
 import { nuevoCodigo } from "./codigo";
+import { sembrarConocimiento } from "./conocimientoSemilla";
 import type { BD } from "./db";
 import { crearProblema, marcarDuplicado, resolverProblema, vincularProblema } from "./relacionados";
 import { aLocal, desdeLocal, habilesEntre, sumarDia, sumarHabiles, ventana } from "./horario";
@@ -566,7 +567,10 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
     const cuando = despuesDe(anexos.map((t) => t.creadoEn!));
     const p = await crearProblema(
       bd,
-      { titulo: "Los teléfonos IP pierden el registro en la central", descripcion: "Varios anexos quedan sin tono a la vez, en distintas unidades." },
+      {
+        titulo: "Los teléfonos IP pierden el registro en la central",
+        descripcion: "Varios anexos quedan sin tono a la vez, en distintas unidades.",
+      },
       "Diego Fuentes",
       cuando,
     );
@@ -586,5 +590,6 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
     }
   }
 
+  await sembrarConocimiento(bd, ahora);
   return { equipos: insertados.length, tickets: ids.length };
 }

@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { boolean, date, index, integer, pgTable, serial, text, timestamp, type AnyPgColumn } from "drizzle-orm/pg-core";
 import type { Categoria, Estado, EstadoEquipo, ModoAsignacion, Prioridad, TipoEquipo } from "../dominio";
 
@@ -109,7 +110,39 @@ export const tecnicos = pgTable("tecnicos", {
   disponible: boolean("disponible").notNull().default(true),
 });
 
+/** Base de conocimiento: soluciones escritas una vez para consultarlas o compartirlas. */
+export const articulos = pgTable(
+  "articulos",
+  {
+    id: serial("id").primaryKey(),
+    titulo: text("titulo").notNull(),
+    categoria: text("categoria").$type<Categoria>().notNull(),
+    /** Texto con párrafos separados por una línea en blanco; las líneas «1.» o «-» forman listas. */
+    contenido: text("contenido").notNull(),
+    /** Si aparece en el portal para los funcionarios; si no, solo lo ven los técnicos. */
+    publico: boolean("publico").notNull().default(true),
+    autor: text("autor").notNull(),
+    /** Ticket del que salió, si se escribió a partir de una solución. */
+    ticketId: integer("ticket_id").references(() => tickets.id, { onDelete: "set null" }),
+    /** Respuestas a «¿Te sirvió?» en el portal. */
+    utiles: integer("utiles").notNull().default(0),
+    noUtiles: integer("no_utiles").notNull().default(0),
+    creadoEn: momento("creado_en").notNull().defaultNow(),
+    actualizadoEn: momento("actualizado_en").notNull().defaultNow(),
+  },
+  (t) => [index("articulos_busqueda_idx").using("gin", sql`to_tsvector('spanish', ${t.titulo} || ' ' || ${t.contenido})`)],
+);
+
+/** Respuestas predefinidas para comentar más rápido. Admiten {solicitante}, {tecnico} y {folio}. */
+export const respuestas = pgTable("respuestas", {
+  id: serial("id").primaryKey(),
+  titulo: text("titulo").notNull(),
+  texto: text("texto").notNull(),
+});
+
 export type Equipo = typeof equipos.$inferSelect;
 export type Ticket = typeof tickets.$inferSelect;
 export type Evento = typeof eventos.$inferSelect;
 export type Problema = typeof problemas.$inferSelect;
+export type Articulo = typeof articulos.$inferSelect;
+export type Respuesta = typeof respuestas.$inferSelect;

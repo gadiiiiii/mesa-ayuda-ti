@@ -1,6 +1,18 @@
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, like, ne, or, sql, type SQL } from "drizzle-orm";
 import type { BD } from "./db";
-import { equipos, eventos, problemas, reglasAsignacion, tecnicos, tickets, type Equipo, type Evento, type Ticket } from "./db/esquema";
+import {
+  articulos,
+  equipos,
+  eventos,
+  problemas,
+  reglasAsignacion,
+  respuestas,
+  tecnicos,
+  tickets,
+  type Equipo,
+  type Evento,
+  type Ticket,
+} from "./db/esquema";
 import {
   CATEGORIAS,
   ESTADOS_EQUIPO,
@@ -593,6 +605,6 @@ export async function resumen(bd: BD, ahora: Date): Promise<Resumen> {
 /** Borra todo (y reinicia los números de ticket). Lo usa el botón de restablecer la demo. */
 export async function vaciar(bd: BD): Promise<void> {
   await bd.execute(
-    sql`TRUNCATE ${eventos}, ${tickets}, ${equipos}, ${reglasAsignacion}, ${tecnicos}, ${problemas} RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE ${eventos}, ${tickets}, ${equipos}, ${reglasAsignacion}, ${tecnicos}, ${problemas}, ${articulos}, ${respuestas} RESTART IDENTITY CASCADE`,
   );
 }

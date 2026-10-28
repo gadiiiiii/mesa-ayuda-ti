@@ -146,3 +146,18 @@ export const esquemaFolio = z
   .trim()
   .regex(/^#?\d+$/, "Escribe el número del ticket, por ejemplo 12.")
   .transform((s) => Number(s.replace("#", "")));
+
+export const esquemaArticulo = z.object({
+  titulo: obligatorio("el título", 5, 140),
+  categoria: opcion(CATEGORIAS, "Elige una categoría."),
+  contenido: obligatorio("el contenido", 20, 10000),
+  publico: z
+    .string()
+    .optional()
+    .transform((s) => s === "on"),
+});
+
+export const esquemaRespuesta = z.object({
+  titulo: obligatorio("el nombre", 3, 60),
+  texto: obligatorio("el texto", 5, 2000),
+});

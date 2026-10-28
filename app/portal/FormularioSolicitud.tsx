@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { LightbulbIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, SelectNativo, Textarea } from "@/components/ui/input";
 import { CATEGORIAS, IMPACTOS, NOMBRE_CATEGORIA, UNIDADES } from "@/lib/dominio";
@@ -12,6 +14,22 @@ export default function FormularioSolicitud() {
   const v = estado.valores ?? {};
   const e = estado.errores ?? {};
   const form = useRef<HTMLFormElement>(null);
+  const [sugerencias, setSugerencias] = useState<{ id: number; titulo: string }[]>([]);
+  const espera = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Mientras escribe qué pasa, buscamos artículos de ayuda parecidos (como en Zendesk o Jira Service Management).
+  const buscar = (texto: string) => {
+    clearTimeout(espera.current);
+    espera.current = setTimeout(async () => {
+      if (texto.trim().length < 4) return setSugerencias([]);
+      try {
+        const r = await fetch(`/api/sugerencias?q=${encodeURIComponent(texto)}`);
+        setSugerencias(r.ok ? await r.json() : []);
+      } catch {
+        setSugerencias([]);
+      }
+    }, 400);
+  };
   useEffect(() => {
     if (estado.intento) form.current?.querySelector<HTMLElement>("[aria-invalid=true]")?.focus();
   }, [estado.intento]);
@@ -45,8 +63,28 @@ export default function FormularioSolicitud() {
       </div>
 
       <Campo id="titulo" etiqueta="Qué pasa" ayuda="Una frase corta, por ejemplo «No puedo entrar al correo»." error={e.titulo}>
-        {(p) => <Input {...p} defaultValue={v.titulo} maxLength={120} autoComplete="off" />}
+        {(p) => <Input {...p} defaultValue={v.titulo} maxLength={120} autoComplete="off" onChange={(e) => buscar(e.target.value)} />}
       </Campo>
+
+      <div aria-live="polite">
+        {sugerencias.length > 0 && (
+          <div className="rounded-md border border-border bg-primary-soft/50 px-4 py-3">
+            <p className="flex items-center gap-1.5 text-sm font-semibold">
+              <LightbulbIcon className="size-4 text-primary" aria-hidden="true" /> Antes de enviar, quizás esto te sirve:
+            </p>
+            <ul className="mt-1.5 flex flex-col gap-1">
+              {sugerencias.map((a) => (
+                <li key={a.id}>
+                  <Link href={`/portal/ayuda/${a.id}`} target="_blank" className="text-primary underline-offset-2 hover:underline">
+                    {a.titulo}
+                    <span className="sr-only"> (se abre en otra pestaña)</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
       <Campo
         id="descripcion"

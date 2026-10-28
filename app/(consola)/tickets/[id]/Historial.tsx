@@ -2,6 +2,7 @@ import { ArrowRightLeftIcon, Link2Icon, MessageSquareIcon, PlusCircleIcon, Signa
 import type { Evento } from "@/lib/db/esquema";
 import { AUTOR_SISTEMA, NOMBRE_ESTADO, NOMBRE_PRIORIDAD, type Estado, type Prioridad } from "@/lib/dominio";
 import { formatearFechaHora, hace } from "@/lib/formato";
+import TextoConEnlaces from "@/app/_componentes/TextoConEnlaces";
 
 interface Contexto {
   solicitante: string;
@@ -122,7 +123,9 @@ export default function Historial({ eventos, ahora, ...contexto }: { eventos: Ev
                   {d.etiquetaNota && (
                     <p className={`text-sm font-semibold ${d.interna ? "text-muted-foreground" : ""}`}>{d.etiquetaNota}</p>
                   )}
-                  <p className="whitespace-pre-line">{d.nota}</p>
+                  <p className="whitespace-pre-line">
+                    <TextoConEnlaces texto={d.nota} />
+                  </p>
                 </div>
               )}
             </div>

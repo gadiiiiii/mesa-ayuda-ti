@@ -14,6 +14,9 @@ import Asignacion from "./Asignacion";
 import Comentar from "./Comentar";
 import Historial from "./Historial";
 import Relacionados from "./Relacionados";
+import ArticulosSugeridos from "./ArticulosSugeridos";
+import { aplicarPlantilla, buscarArticulos, listarRespuestas } from "@/lib/conocimiento";
+import { tecnicoActual } from "@/app/sesion";
 import { duplicadosDe, listarProblemas, obtenerProblema } from "@/lib/relacionados";
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<Parametros> };
@@ -34,11 +37,18 @@ export default async function PaginaTicket({ params, searchParams }: Props) {
   if (!d) notFound();
   const { ticket: t, equipo, eventos } = d;
   const bd = await obtenerBD();
-  const [duplicados, problema, abiertos] = await Promise.all([
+  const [duplicados, problema, abiertos, sugeridos, plantillas, tecnico] = await Promise.all([
     duplicadosDe(bd, t.id),
     t.problemaId ? obtenerProblema(bd, t.problemaId) : null,
     listarProblemas(bd, true),
+    buscarArticulos(bd, { q: t.titulo, categoria: t.categoria }, 3),
+    listarRespuestas(bd),
+    tecnicoActual(),
   ]);
+  const respuestas = plantillas.map((r) => ({
+    titulo: r.titulo,
+    texto: aplicarPlantilla(r.texto, { solicitante: t.solicitante, tecnico, folio: t.id }),
+  }));
   const creado = texto(await searchParams, "creado") === "1";
   const ahora = new Date();
 
@@ -87,7 +97,7 @@ export default async function PaginaTicket({ params, searchParams }: Props) {
               Historial
             </h2>
             <Historial eventos={eventos} ahora={ahora} solicitante={t.solicitante} origen={t.origen} />
-            <Comentar id={t.id} />
+            <Comentar id={t.id} respuestas={respuestas} />
           </section>
         </div>
 
@@ -104,6 +114,21 @@ export default async function PaginaTicket({ params, searchParams }: Props) {
               Asignación
             </h2>
             <Asignacion id={t.id} tecnico={t.tecnico} prioridad={t.prioridad} />
+          </section>
+
+          <section aria-labelledby="titulo-sugeridos" className="rounded-lg border border-border bg-card p-5">
+            <h2 id="titulo-sugeridos" className="text-lg font-bold">
+              Base de conocimiento
+            </h2>
+            <ArticulosSugeridos id={t.id} articulos={sugeridos.map((a) => ({ id: a.id, titulo: a.titulo, publico: a.publico }))} />
+            {t.estado === "resuelto" || t.estado === "cerrado" ? (
+              <Link
+                href={`/conocimiento/nuevo?ticket=${t.id}`}
+                className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline sm:min-h-0"
+              >
+                Crear un artículo con esta solución
+              </Link>
+            ) : null}
           </section>
 
           <section aria-labelledby="titulo-relacionados" className="rounded-lg border border-border bg-card p-5">

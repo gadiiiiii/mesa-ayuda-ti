@@ -1,16 +1,52 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/input";
+import { SelectNativo, Textarea } from "@/components/ui/input";
 import { accionComentar, type EstadoFormulario } from "@/app/acciones";
 import Campo, { AvisoError } from "@/app/_componentes/Campo";
 
-export default function Comentar({ id }: { id: number }) {
+/** `respuestas`: las predefinidas, ya con el nombre del solicitante, el técnico y el folio. */
+export default function Comentar({ id, respuestas }: { id: number; respuestas: { titulo: string; texto: string }[] }) {
   const [estado, enviar, enviando] = useActionState<EstadoFormulario, FormData>(accionComentar, {});
+  const form = useRef<HTMLFormElement>(null);
+
+  // Una respuesta predefinida reemplaza el texto y se marca como visible para el solicitante.
+  const usar = (i: number) => {
+    const f = form.current;
+    const r = respuestas[i];
+    if (!f || !r) return;
+    const area = f.querySelector<HTMLTextAreaElement>("#texto")!;
+    area.value = r.texto;
+    f.querySelector<HTMLInputElement>('input[name=publico][value="on"]')!.checked = true;
+    area.focus();
+  };
+
   return (
-    <form action={enviar} className="mt-6 flex flex-col gap-3 rounded-lg border border-border bg-card p-4" noValidate>
+    <form ref={form} action={enviar} className="mt-6 flex flex-col gap-3 rounded-lg border border-border bg-card p-4" noValidate>
       <input type="hidden" name="id" value={id} />
+      {respuestas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <label htmlFor="respuesta-predefinida" className="font-semibold">
+            Respuesta predefinida
+          </label>
+          <SelectNativo
+            id="respuesta-predefinida"
+            value=""
+            onChange={(e) => usar(Number(e.target.value))}
+            className="min-w-0 flex-1 sm:max-w-xs"
+          >
+            <option value="" disabled>
+              Elegir para insertar…
+            </option>
+            {respuestas.map((r, i) => (
+              <option key={i} value={i}>
+                {r.titulo}
+              </option>
+            ))}
+          </SelectNativo>
+        </div>
+      )}
       <Campo
         id="texto"
         etiqueta="Agregar un comentario"

@@ -18,10 +18,20 @@ import {
 import { obtenerBD } from "@/lib/db";
 import { CATEGORIAS, MODOS_ASIGNACION, esTecnico, type Categoria, type ModoAsignacion, type Regla } from "@/lib/dominio";
 import { normalizarCodigo } from "@/lib/codigo";
+import {
+  actualizarArticulo,
+  crearArticulo,
+  eliminarArticulo,
+  eliminarRespuesta,
+  guardarRespuesta,
+  obtenerArticulo,
+  votarArticulo,
+} from "@/lib/conocimiento";
 import { crearProblema, marcarDuplicado, resolverProblema, vincularProblema } from "@/lib/relacionados";
 import { sembrar } from "@/lib/semilla";
 import {
   erroresPorCampo,
+  esquemaArticulo,
   esquemaAsignacion,
   esquemaCambioEstado,
   esquemaComentario,
@@ -29,6 +39,7 @@ import {
   esquemaFolio,
   esquemaProblema,
   esquemaResolverProblema,
+  esquemaRespuesta,
   esquemaSolicitud,
   esquemaTicketNuevo,
   valores,
@@ -228,4 +239,80 @@ export async function accionResolverProblema(_: EstadoFormulario, form: FormData
   revalidatePath("/", "layout");
   const n = r.valor.ticketsResueltos;
   return { ok: Date.now(), mensaje: n ? `Problema resuelto, junto con ${n === 1 ? "1 ticket" : `${n} tickets`}.` : "Problema resuelto." };
+}
+
+// ── Base de conocimiento ───────────────────────────────────────────────────
+
+export async function accionGuardarArticulo(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const datos = valores(form);
+  const v = esquemaArticulo.safeParse(datos);
+  if (!v.success) return { errores: erroresPorCampo(v.error), valores: datos, mensaje: "Revisa los campos marcados.", intento: Date.now() };
+  const bd = await obtenerBD();
+  const id = idDe(form);
+  let destino: number;
+  if (id) {
+    const r = await actualizarArticulo(bd, id, v.data, new Date());
+    if (!r.ok) return { mensaje: r.error, valores: datos, intento: Date.now() };
+    destino = id;
+  } else {
+    const ticketId = Number(form.get("ticketId")) || null;
+    destino = await crearArticulo(bd, { ...v.data, ticketId }, await tecnicoActual(), new Date());
+  }
+  revalidatePath("/", "layout");
+  redirect(`/conocimiento/${destino}`);
+}
+
+export async function accionEliminarArticulo(form: FormData) {
+  const id = idDe(form);
+  if (id) await eliminarArticulo(await obtenerBD(), id);
+  revalidatePath("/", "layout");
+  redirect("/conocimiento");
+}
+
+export async function accionVotarArticulo(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const id = idDe(form);
+  if (!id) return { mensaje: "Datos no válidos." };
+  const r = await votarArticulo(await obtenerBD(), id, form.get("util") === "si");
+  if (!r.ok) return { mensaje: r.error };
+  revalidatePath("/", "layout");
+  return {
+    ok: Date.now(),
+    mensaje: form.get("util") === "si" ? "Gracias. Nos alegra que te sirviera." : "Gracias. Si necesitas ayuda, pídela en el portal.",
+  };
+}
+
+/** Comparte un artículo público con el solicitante de un ticket, como respuesta visible en el portal. */
+export async function accionEnviarArticulo(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const id = idDe(form);
+  const articuloId = Number(form.get("articulo"));
+  if (!id || !Number.isInteger(articuloId)) return { mensaje: "Datos no válidos. Recarga la página." };
+  const bd = await obtenerBD();
+  const a = await obtenerArticulo(bd, articuloId);
+  if (!a?.publico) return { mensaje: "Ese artículo no es público." };
+  const r = await comentar(
+    bd,
+    id,
+    `Te puede servir este artículo: «${a.titulo}». /portal/ayuda/${a.id}`,
+    await tecnicoActual(),
+    new Date(),
+    true,
+  );
+  if (!r.ok) return { mensaje: r.error };
+  revalidatePath("/", "layout");
+  return { ok: Date.now(), mensaje: "Artículo enviado al solicitante." };
+}
+
+export async function accionGuardarRespuesta(_: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const datos = valores(form);
+  const v = esquemaRespuesta.safeParse(datos);
+  if (!v.success) return { errores: erroresPorCampo(v.error), valores: datos };
+  await guardarRespuesta(await obtenerBD(), { id: idDe(form), ...v.data });
+  revalidatePath("/", "layout");
+  return { ok: Date.now(), mensaje: "Respuesta guardada." };
+}
+
+export async function accionEliminarRespuesta(form: FormData) {
+  const id = idDe(form);
+  if (id) await eliminarRespuesta(await obtenerBD(), id);
+  revalidatePath("/", "layout");
 }

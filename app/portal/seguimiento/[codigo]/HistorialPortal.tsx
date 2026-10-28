@@ -1,6 +1,7 @@
 import type { Evento } from "@/lib/db/esquema";
 import type { Estado } from "@/lib/dominio";
 import { formatearFechaHora } from "@/lib/formato";
+import TextoConEnlaces from "@/app/_componentes/TextoConEnlaces";
 
 /** El historial contado a quien pidió ayuda: solo lo público, en segunda persona. */
 function describir(e: Evento, solicitante: string): { texto: string; etiqueta?: string; destacado?: boolean } {
@@ -44,7 +45,9 @@ export default function HistorialPortal({ eventos, solicitante, ahora }: { event
                 className={`mt-1.5 max-w-[70ch] rounded-md border px-3 py-2 ${d.destacado ? "border-success/40 bg-success-soft" : "border-border bg-card"}`}
               >
                 {d.etiqueta && <p className="text-sm font-semibold">{d.etiqueta}</p>}
-                <p className="whitespace-pre-line">{e.texto}</p>
+                <p className="whitespace-pre-line">
+                  <TextoConEnlaces texto={e.texto} />
+                </p>
               </div>
             )}
           </li>

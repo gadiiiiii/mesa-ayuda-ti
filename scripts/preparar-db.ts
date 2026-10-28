@@ -5,6 +5,7 @@
 import { count } from "drizzle-orm";
 import { conectarNeon, migrar, obtenerBD } from "../lib/db";
 import { equipos } from "../lib/db/esquema";
+import { sembrarConocimiento } from "../lib/conocimientoSemilla";
 import { sembrar } from "../lib/semilla";
 
 async function main() {
@@ -18,7 +19,10 @@ async function main() {
     const r = await sembrar(bd, new Date());
     console.log(`Base lista (${destino}): migraciones aplicadas y ${r.equipos} equipos y ${r.tickets} tickets de ejemplo.`);
   } else {
-    console.log(`Base lista (${destino}): migraciones al día, ya tenía datos.`);
+    // Contenido que llegó con versiones nuevas (por ejemplo, la base de conocimiento) en una base que ya tenía datos.
+    const c = await sembrarConocimiento(bd, new Date());
+    const extra = c.articulos || c.respuestas ? ` Se agregaron ${c.articulos} artículos y ${c.respuestas} respuestas predefinidas.` : "";
+    console.log(`Base lista (${destino}): migraciones al día, ya tenía datos.${extra}`);
   }
   process.exit(0);
 }

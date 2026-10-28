@@ -21,6 +21,9 @@ export default function LayoutPortal({ children }: { children: React.ReactNode }
             Informática
           </Link>
           <nav aria-label="Portal" className="flex gap-5 text-sm font-semibold">
+            <Link href="/portal/ayuda" className="inline-flex min-h-11 items-center text-primary hover:underline">
+              Ayuda
+            </Link>
             <Link href="/portal/seguimiento" className="inline-flex min-h-11 items-center text-primary hover:underline">
               Revisar mi solicitud
             </Link>
@@ -30,7 +33,7 @@ export default function LayoutPortal({ children }: { children: React.ReactNode }
           </nav>
         </div>
       </header>
-      <main id="contenido" className="mx-auto max-w-[60rem] px-4 pt-8 pb-16 sm:px-6">
+      <main id="principal" className="mx-auto max-w-[60rem] px-4 pt-8 pb-16 sm:px-6">
         {children}
       </main>
     </>

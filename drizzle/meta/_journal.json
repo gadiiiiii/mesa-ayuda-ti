@@ -36,6 +36,13 @@
       "when": 1793201947908,
       "tag": "0004_relacionados",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793202443780,
+      "tag": "0005_conocimiento",
+      "breakpoints": true
     }
   ]
 }

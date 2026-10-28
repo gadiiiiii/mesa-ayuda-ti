@@ -9,6 +9,7 @@ const ENLACES = [
   { href: "/mis-tickets", texto: "Mis tickets", activo: (p: string) => p.startsWith("/mis-tickets") },
   { href: "/tickets", texto: "Tickets", activo: (p: string) => p.startsWith("/tickets") },
   { href: "/inventario", texto: "Inventario", activo: (p: string) => p.startsWith("/inventario") },
+  { href: "/conocimiento", texto: "Conocimiento", activo: (p: string) => p.startsWith("/conocimiento") || p.startsWith("/respuestas") },
   { href: "/portal", texto: "Portal", activo: (p: string) => p.startsWith("/portal") },
 ];
 

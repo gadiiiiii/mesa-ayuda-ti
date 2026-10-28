@@ -5,7 +5,7 @@ export default function LayoutConsola({ children }: { children: React.ReactNode 
   return (
     <>
       <BarraSuperior />
-      <main id="contenido" className="mx-auto max-w-[76rem] px-4 pt-6 pb-16 sm:px-6">
+      <main id="principal" className="mx-auto max-w-[76rem] px-4 pt-6 pb-16 sm:px-6">
         {children}
       </main>
     </>
