@@ -6,6 +6,7 @@ import {
   CircleDotIcon,
   ClockIcon,
   PauseCircleIcon,
+  PauseIcon,
 } from "lucide-react";
 import {
   NOMBRE_ESTADO,
@@ -75,8 +76,9 @@ export function PrioridadTicket({ prioridad, className }: { prioridad: Prioridad
 type DatosPlazo = Parameters<typeof calcularPlazo>[0];
 
 /**
- * La barra de plazo: cuánto del plazo de la prioridad ya pasó.
- * Gris a tiempo, ámbar en el último cuarto, roja y llena si se venció. Siempre con el texto.
+ * La barra de plazo: cuánto del plazo hábil de la prioridad ya se usó.
+ * Gris a tiempo, ámbar en el último cuarto, roja y llena si se venció, y apagada con ícono
+ * de pausa mientras el ticket está en espera. Siempre con el texto.
  */
 export function Plazo({ ticket, ahora, compacto = false }: { ticket: DatosPlazo; ahora: Date; compacto?: boolean }) {
   const p = calcularPlazo(ticket, ahora);
@@ -84,14 +86,15 @@ export function Plazo({ ticket, ahora, compacto = false }: { ticket: DatosPlazo;
   if (p.estado === "cumplido" || p.estado === "incumplido" || p.estado === "sin_plazo") {
     return <span className={cn("text-sm", p.estado === "incumplido" ? "text-warning" : "text-muted-foreground")}>{texto}</span>;
   }
-  const total = ticket.venceEn.getTime() - ticket.creadoEn.getTime();
-  const usado = Math.min(1, Math.max(0, (ahora.getTime() - ticket.creadoEn.getTime()) / total));
+  const usado = p.usado;
   const tono =
-    p.estado === "vencido"
-      ? { barra: "bg-destructive", texto: "text-destructive font-semibold", Icono: AlertTriangleIcon }
-      : p.estado === "por_vencer"
-        ? { barra: "bg-warning", texto: "text-warning font-semibold", Icono: ClockIcon }
-        : { barra: "bg-muted-foreground/70", texto: "text-muted-foreground", Icono: ClockIcon };
+    p.estado === "pausado"
+      ? { barra: p.diferencia > 0 ? "bg-muted-foreground/40" : "bg-destructive/50", texto: "text-muted-foreground", Icono: PauseIcon }
+      : p.estado === "vencido"
+        ? { barra: "bg-destructive", texto: "text-destructive font-semibold", Icono: AlertTriangleIcon }
+        : p.estado === "por_vencer"
+          ? { barra: "bg-warning", texto: "text-warning font-semibold", Icono: ClockIcon }
+          : { barra: "bg-muted-foreground/70", texto: "text-muted-foreground", Icono: ClockIcon };
   return (
     <span className={cn("flex flex-col gap-1", compacto ? "w-44" : "w-full max-w-64")}>
       <span className={cn("inline-flex items-center gap-1 text-sm", tono.texto)}>

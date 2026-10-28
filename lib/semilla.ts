@@ -1,4 +1,5 @@
 import type { BD } from "./db";
+import { aLocal, desdeLocal, habilesEntre, sumarDia, sumarHabiles, ventana } from "./horario";
 import { equipos, eventos, tickets } from "./db/esquema";
 import {
   HORAS_PLAZO,
@@ -290,6 +291,21 @@ const MOTIVOS_CIERRE = ["Duplicado de otro ticket.", "El solicitante indica que 
 
 const HORA = 3_600_000;
 
+/** Un momento en horario de oficina de hace `diasAtras` días (o del día hábil anterior), nunca después de `ahora`. */
+function momentoHabil(az: ReturnType<typeof crearAzar>, ahora: Date, diasAtras: number): Date {
+  const hoy = aLocal(ahora);
+  let fecha = sumarDia(hoy.fecha, -diasAtras);
+  for (let i = 0; i < 30; i++) {
+    const v = ventana(fecha);
+    if (v) {
+      const fin = fecha === hoy.fecha ? Math.min(v[1] - 30 * 60_000, hoy.ms) : v[1] - 30 * 60_000;
+      if (fin > v[0]) return desdeLocal(fecha, v[0] + Math.floor(az.siguiente() * (fin - v[0])));
+    }
+    fecha = sumarDia(fecha, -1);
+  }
+  return ahora;
+}
+
 export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; tickets: number }> {
   const az = crearAzar(20261028);
   const persona = () => `${az.elegir(NOMBRES)} ${az.elegir(APELLIDOS)}`;
@@ -362,9 +378,8 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
   const filas: Fila[] = [];
   const TOTAL = 75;
   for (let k = 0; k < TOTAL; k++) {
-    // Más tickets recientes que antiguos.
-    const horasAtras = Math.pow(az.siguiente(), 1.6) * 30 * 24;
-    const creadoEn = new Date(ahora.getTime() - horasAtras * HORA);
+    // Más tickets recientes que antiguos, y siempre en horario de oficina.
+    const creadoEn = momentoHabil(az, ahora, Math.floor(Math.pow(az.siguiente(), 1.6) * 30));
     const plantilla = az.elegir(PLANTILLAS);
     const prioridad = az.ponderado<Prioridad>([
       ["baja", 25],
@@ -378,14 +393,16 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
     const solicitante = equipo?.responsable ?? persona();
     const tecnico = az.elegir(TECNICOS);
     const ev: Fila["eventos"] = [{ tipo: "creado", autor: solicitante, creadoEn }];
-    const en = (horas: number) => new Date(creadoEn.getTime() + horas * HORA);
+    // Todo se mide en horas hábiles desde la creación.
+    const en = (horas: number) => sumarHabiles(creadoEn, horas * HORA);
 
     const plazoHoras = HORAS_PLAZO[prioridad];
-    const edad = horasAtras;
-    const probPendiente = edad < 24 ? 0.8 : edad < 72 ? 0.4 : edad < 168 ? 0.12 : 0.02;
+    const edad = habilesEntre(creadoEn, ahora) / HORA;
+    const probPendiente = edad < 9 ? 0.8 : edad < 27 ? 0.4 : edad < 63 ? 0.12 : 0.02;
     let estado: Estado;
     let resueltoEn: Date | null = null;
     let asignado: string | null = null;
+    let pausadoDesde: Date | null = null;
 
     // Tomado por un técnico al rato de llegar.
     const tomado = Math.min(edad * 0.5, az.siguiente() * Math.min(plazoHoras, 6) * 0.3 + 0.1);
@@ -406,13 +423,14 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
       ]);
       if (estado !== "abierto") tomar();
       if (estado === "en_espera") {
+        pausadoDesde = en(Math.min(edad * 0.8, tomado + 1));
         ev.push({
           tipo: "estado",
           autor: tecnico,
           desde: "en_curso",
           hacia: "en_espera",
           texto: az.elegir(NOTAS_ESPERA),
-          creadoEn: en(Math.min(edad * 0.8, tomado + 1)),
+          creadoEn: pausadoDesde,
         });
       } else if (estado === "en_curso" && az.siguiente() < 0.4) {
         ev.push({ tipo: "comentario", autor: tecnico, texto: az.elegir(COMENTARIOS), creadoEn: en(Math.min(edad * 0.9, tomado + 0.5)) });
@@ -434,9 +452,9 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
       resueltoEn = en(duracion);
       estado = "resuelto";
       ev.push({ tipo: "estado", autor: tecnico, desde: "en_curso", hacia: "resuelto", texto: plantilla.solucion, creadoEn: resueltoEn });
-      if (edad - duracion > 48 && az.siguiente() < 0.7) {
+      if (edad - duracion > 18 && az.siguiente() < 0.7) {
         estado = "cerrado";
-        ev.push({ tipo: "estado", autor: tecnico, desde: "resuelto", hacia: "cerrado", creadoEn: en(duracion + 24) });
+        ev.push({ tipo: "estado", autor: tecnico, desde: "resuelto", hacia: "cerrado", creadoEn: en(duracion + 9) });
       }
     }
 
@@ -456,6 +474,7 @@ export async function sembrar(bd: BD, ahora: Date): Promise<{ equipos: number; t
         actualizadoEn: ultimo,
         venceEn: calcularVencimiento(creadoEn, prioridad),
         resueltoEn,
+        pausadoDesde,
       },
       eventos: ev,
     });

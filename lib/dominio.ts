@@ -1,3 +1,5 @@
+import { habilesEntre, sumarHabiles } from "./horario";
+
 /**
  * Reglas de la mesa de ayuda: estados de un ticket y cómo se pasa de uno a otro,
  * plazos por prioridad e inventario. No depende de la base de datos.
@@ -71,14 +73,17 @@ export const NOMBRE_PRIORIDAD: Record<Prioridad, string> = {
   urgente: "Urgente",
 };
 
-/** Horas corridas para resolver, según la prioridad. */
-export const HORAS_PLAZO: Record<Prioridad, number> = { urgente: 4, alta: 8, media: 24, baja: 72 };
+/**
+ * Horas hábiles para resolver, según la prioridad. El plazo solo corre en horario de oficina
+ * (ver `horario.ts`) y se detiene mientras el ticket está en espera.
+ */
+export const HORAS_PLAZO: Record<Prioridad, number> = { urgente: 4, alta: 8, media: 16, baja: 40 };
 
 export const DESCRIPCION_PRIORIDAD: Record<Prioridad, string> = {
-  urgente: "Detiene la atención de público o a toda una unidad. Plazo: 4 horas.",
-  alta: "Una persona no puede trabajar. Plazo: 8 horas.",
-  media: "Se puede trabajar, pero con dificultad. Plazo: 24 horas.",
-  baja: "Consultas, instalaciones y mejoras. Plazo: 72 horas.",
+  urgente: "Detiene la atención de público o a toda una unidad. Plazo: 4 horas hábiles.",
+  alta: "Una persona no puede trabajar. Plazo: 8 horas hábiles, cerca de un día.",
+  media: "Se puede trabajar, pero con dificultad. Plazo: 16 horas hábiles, cerca de dos días.",
+  baja: "Consultas, instalaciones y mejoras. Plazo: 40 horas hábiles, cerca de una semana.",
 };
 
 export const CATEGORIAS = ["hardware", "software", "red", "impresoras", "cuentas", "telefonia", "otro"] as const;
@@ -94,61 +99,90 @@ export const NOMBRE_CATEGORIA: Record<Categoria, string> = {
   otro: "Otro",
 };
 
-const HORA = 3_600_000;
+const MIN = 60_000;
+const HORA = 60 * MIN;
 
-export function calcularVencimiento(creadoEn: Date, prioridad: Prioridad): Date {
-  return new Date(creadoEn.getTime() + HORAS_PLAZO[prioridad] * HORA);
+/** Fin del plazo: las horas de la prioridad más el tiempo que pasó en espera, todo en tiempo hábil. */
+export function calcularVencimiento(creadoEn: Date, prioridad: Prioridad, minutosPausa = 0): Date {
+  return sumarHabiles(creadoEn, HORAS_PLAZO[prioridad] * HORA + minutosPausa * MIN);
 }
 
-export type EstadoPlazo = "a_tiempo" | "por_vencer" | "vencido" | "cumplido" | "incumplido" | "sin_plazo";
+/** Minutos hábiles entre dos instantes (para sumar a la pausa al salir de «en espera»). */
+export function minutosHabiles(desde: Date, hasta: Date): number {
+  return Math.max(0, Math.round(habilesEntre(desde, hasta) / MIN));
+}
+
+export type EstadoPlazo = "a_tiempo" | "por_vencer" | "vencido" | "pausado" | "cumplido" | "incumplido" | "sin_plazo";
 
 export interface Plazo {
   estado: EstadoPlazo;
-  /** Milisegundos: positivo si falta, negativo si ya pasó. Respecto de la resolución si está resuelto. */
+  /** Tiempo hábil en ms: positivo si queda, negativo si se pasó. */
   diferencia: number;
+  /** Fracción del plazo ya usada (0 a 1), para la barra. */
+  usado: number;
+}
+
+export interface DatosPlazo {
+  estado: Estado;
+  prioridad: Prioridad;
+  venceEn: Date;
+  resueltoEn: Date | null;
+  pausadoDesde: Date | null;
 }
 
 /**
- * Estado del plazo de un ticket. Mientras está pendiente se compara con `ahora`
- * («por vencer» cuando queda un cuarto del plazo o menos); una vez resuelto, con la fecha de resolución.
- * Un ticket cerrado sin resolver no tiene plazo que cumplir.
+ * Estado del plazo de un ticket, en tiempo hábil. Pendiente: se compara con `ahora`
+ * («por vencer» cuando queda un cuarto del plazo o menos). En espera: el reloj está detenido
+ * desde que se pausó. Resuelto: se compara con la hora de resolución. Cerrado sin resolver: sin plazo.
  */
-export function plazo(
-  t: { estado: Estado; prioridad: Prioridad; creadoEn: Date; venceEn: Date; resueltoEn: Date | null },
-  ahora: Date,
-): Plazo {
-  if (estaPendiente(t.estado)) {
-    const diferencia = t.venceEn.getTime() - ahora.getTime();
-    const total = t.venceEn.getTime() - t.creadoEn.getTime();
-    return { estado: diferencia < 0 ? "vencido" : diferencia <= total / 4 ? "por_vencer" : "a_tiempo", diferencia };
+export function plazo(t: DatosPlazo, ahora: Date): Plazo {
+  const total = HORAS_PLAZO[t.prioridad] * HORA;
+  const conUso = (estado: EstadoPlazo, diferencia: number): Plazo => ({
+    estado,
+    diferencia,
+    usado: Math.min(1, Math.max(0, 1 - diferencia / total)),
+  });
+  if (t.estado === "en_espera" && t.pausadoDesde) {
+    return conUso("pausado", habilesEntre(t.pausadoDesde, t.venceEn));
   }
-  if (!t.resueltoEn) return { estado: "sin_plazo", diferencia: 0 };
-  const diferencia = t.venceEn.getTime() - t.resueltoEn.getTime();
-  return { estado: diferencia >= 0 ? "cumplido" : "incumplido", diferencia };
+  if (estaPendiente(t.estado)) {
+    if (ahora > t.venceEn) return conUso("vencido", -habilesEntre(t.venceEn, ahora));
+    const diferencia = habilesEntre(ahora, t.venceEn);
+    return conUso(diferencia <= total / 4 ? "por_vencer" : "a_tiempo", diferencia);
+  }
+  if (!t.resueltoEn) return { estado: "sin_plazo", diferencia: 0, usado: 0 };
+  const cumplido = t.resueltoEn <= t.venceEn;
+  return conUso(
+    cumplido ? "cumplido" : "incumplido",
+    cumplido ? habilesEntre(t.resueltoEn, t.venceEn) : -habilesEntre(t.venceEn, t.resueltoEn),
+  );
 }
 
-/** «3 h 20 min», «2 d 4 h», «15 min». */
+/** «3 h 20 min», «15 min», «23 h». En horas, porque los días hábiles no miden lo mismo. */
 export function duracion(ms: number): string {
-  const min = Math.max(0, Math.round(Math.abs(ms) / 60_000));
+  const min = Math.max(0, Math.round(Math.abs(ms) / MIN));
   if (min < 60) return `${min} min`;
   const h = Math.floor(min / 60);
   // Desde 10 horas los minutos ya no aportan.
-  if (h < 24) return min % 60 && h < 10 ? `${h} h ${min % 60} min` : `${h} h`;
-  const d = Math.floor(h / 24);
-  return h % 24 ? `${d} d ${h % 24} h` : `${d} d`;
+  return min % 60 && h < 10 ? `${h} h ${min % 60} min` : `${h} h`;
 }
+
+/** «4 h hábiles», pero «40 min» (con minutos no hace falta aclararlo). */
+const habil = (ms: number) => (Math.abs(ms) < HORA ? duracion(ms) : `${duracion(ms)} hábiles`);
 
 export function textoPlazo(p: Plazo): string {
   switch (p.estado) {
     case "a_tiempo":
     case "por_vencer":
-      return `Vence en ${duracion(p.diferencia)}`;
+      return `Quedan ${habil(p.diferencia)}`;
     case "vencido":
-      return `Vencido hace ${duracion(p.diferencia)}`;
+      return Math.abs(p.diferencia) < MIN ? "Vencido" : `Vencido hace ${habil(p.diferencia)}`;
+    case "pausado":
+      return p.diferencia > 0 ? `En pausa, quedan ${habil(p.diferencia)}` : "En pausa, ya estaba vencido";
     case "cumplido":
       return "Resuelto dentro del plazo";
     case "incumplido":
-      return `Resuelto ${duracion(p.diferencia)} fuera de plazo`;
+      return `Resuelto ${habil(p.diferencia)} fuera de plazo`;
     case "sin_plazo":
       return "Cerrado sin resolver";
   }

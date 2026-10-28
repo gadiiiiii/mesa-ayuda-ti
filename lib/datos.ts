@@ -9,6 +9,7 @@ import {
   TECNICOS,
   accionPara,
   calcularVencimiento,
+  minutosHabiles,
   esTecnico,
   plazo,
   siguienteCodigo,
@@ -39,7 +40,18 @@ export interface FiltrosTickets {
 
 export type FilaTicket = Pick<
   Ticket,
-  "id" | "titulo" | "solicitante" | "unidad" | "categoria" | "prioridad" | "estado" | "tecnico" | "creadoEn" | "venceEn" | "resueltoEn"
+  | "id"
+  | "titulo"
+  | "solicitante"
+  | "unidad"
+  | "categoria"
+  | "prioridad"
+  | "estado"
+  | "tecnico"
+  | "creadoEn"
+  | "venceEn"
+  | "resueltoEn"
+  | "pausadoDesde"
 > & { equipoCodigo: string | null };
 
 const columnasFila = {
@@ -54,6 +66,7 @@ const columnasFila = {
   creadoEn: tickets.creadoEn,
   venceEn: tickets.venceEn,
   resueltoEn: tickets.resueltoEn,
+  pausadoDesde: tickets.pausadoDesde,
   equipoCodigo: equipos.codigo,
 };
 
@@ -150,6 +163,13 @@ export async function cambiarEstado(
   await bd.transaction(async (tx) => {
     const cambios: Partial<Ticket> = { estado: hacia, actualizadoEn: ahora };
     if (hacia === "resuelto") cambios.resueltoEn = ahora;
+    // En espera el plazo se detiene; al salir, el tiempo hábil detenido alarga el plazo.
+    if (hacia === "en_espera") cambios.pausadoDesde = ahora;
+    if (t.estado === "en_espera" && t.pausadoDesde) {
+      cambios.minutosPausa = t.minutosPausa + minutosHabiles(t.pausadoDesde, ahora);
+      cambios.venceEn = calcularVencimiento(t.creadoEn, t.prioridad, cambios.minutosPausa);
+      cambios.pausadoDesde = null;
+    }
     if (hacia === "abierto" && (t.estado === "resuelto" || t.estado === "cerrado")) cambios.resueltoEn = null;
     // Quien toma un ticket sin técnico queda asignado.
     const asignar = hacia === "en_curso" && !t.tecnico && esTecnico(autor);
@@ -195,7 +215,7 @@ export async function actualizarAsignacion(
   if (datos.prioridad !== t.prioridad) {
     nuevos.prioridad = datos.prioridad;
     // El plazo se recalcula desde la creación: subir la prioridad lo acorta.
-    nuevos.venceEn = calcularVencimiento(t.creadoEn, datos.prioridad);
+    nuevos.venceEn = calcularVencimiento(t.creadoEn, datos.prioridad, t.minutosPausa);
     registro.push({ ticketId: id, tipo: "prioridad", autor, desde: t.prioridad, hacia: datos.prioridad, creadoEn: ahora });
   }
   if (!registro.length) return bien({ cambios: 0 });

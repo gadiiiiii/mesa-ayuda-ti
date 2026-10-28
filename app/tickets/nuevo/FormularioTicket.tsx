@@ -153,7 +153,7 @@ export default function FormularioTicket({ equipos, inicial }: { equipos: Equipo
         <Button type="submit" disabled={enviando}>
           {enviando ? "Creando…" : "Crear ticket"}
         </Button>
-        <p className="text-sm text-muted-foreground">El plazo empieza a correr desde ahora.</p>
+        <p className="text-sm text-muted-foreground">El plazo corre en horario de oficina, desde ahora o desde que abre.</p>
       </div>
     </form>
   );

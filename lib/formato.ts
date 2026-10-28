@@ -29,6 +29,21 @@ export function formatearFechaHora(d: Date, ahora = new Date()): string {
   return limpiar((anioDe(d) === anioDe(ahora) ? fechaHora : fechaHoraAnio).format(d));
 }
 
+const conDia = new Intl.DateTimeFormat("es-CL", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  timeZone: ZONA,
+});
+
+/** «jue 29 oct 09:00»: para vencimientos, donde importa el día de la semana. */
+export function formatearConDia(d: Date): string {
+  return limpiar(conDia.format(d)).replace(/,/g, "");
+}
+
 /** «miércoles 28 de octubre». */
 export function formatearDia(d: Date): string {
   return fechaLarga.format(d);

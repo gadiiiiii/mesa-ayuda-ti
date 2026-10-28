@@ -15,16 +15,18 @@ Mesa de ayuda e inventario de equipos para el soporte informático de una oficin
 
 ### Tickets con plazo
 
-Cada ticket tiene un plazo en horas corridas que depende de su prioridad:
+Cada ticket tiene un plazo en **horas hábiles** que depende de su prioridad:
 
 | Prioridad | Cuándo | Plazo |
 |---|---|---|
-| Urgente | Detiene la atención de público o a toda una unidad | 4 horas |
-| Alta | Una persona no puede trabajar | 8 horas |
-| Media | Se puede trabajar, pero con dificultad | 24 horas |
-| Baja | Consultas, instalaciones y mejoras | 72 horas |
+| Urgente | Detiene la atención de público o a toda una unidad | 4 horas hábiles |
+| Alta | Una persona no puede trabajar | 8 horas hábiles (cerca de un día) |
+| Media | Se puede trabajar, pero con dificultad | 16 horas hábiles (cerca de dos días) |
+| Baja | Consultas, instalaciones y mejoras | 40 horas hábiles (cerca de una semana) |
 
-Una **barra de plazo** muestra cuánto se ha consumido: gris a tiempo, ámbar en el último cuarto y roja cuando se venció. Al resolverse, el ticket queda marcado como resuelto dentro o fuera de plazo. Cambiar la prioridad recalcula el plazo desde que se creó el ticket.
+El plazo corre solo en horario de oficina (lunes a jueves de 8:30 a 17:30 y viernes de 8:30 a 16:30), salta fines de semana y feriados nacionales de Chile, y **se detiene mientras el ticket está en espera** (por un repuesto, el proveedor o el solicitante). Un ticket que llega a las 17:00 de un viernes no se vence el fin de semana.
+
+Una **barra de plazo** muestra cuánto se ha consumido: gris a tiempo, ámbar en el último cuarto, roja cuando se venció y apagada mientras está en pausa. Al resolverse, el ticket queda marcado como resuelto dentro o fuera de plazo. Cambiar la prioridad recalcula el plazo desde que se creó el ticket.
 
 ### Estados
 
@@ -64,9 +66,10 @@ Arriba a la derecha se elige **como qué técnico actúas** (se guarda en una co
 - Accesibilidad: auditada con axe-core (WCAG 2.1 AA, modo claro y oscuro, sin infracciones), navegable con teclado, selects nativos en el celular y los estados nunca se distinguen solo por color.
 - La lógica está separada de la interfaz:
   - [`lib/dominio.ts`](lib/dominio.ts): estados y cambios permitidos, plazos, códigos de inventario.
+  - [`lib/horario.ts`](lib/horario.ts): tiempo hábil en la hora de Chile (con su cambio de horario), con los feriados de [`lib/feriados.ts`](lib/feriados.ts).
   - [`lib/datos.ts`](lib/datos.ts): consultas y cambios en la base, cada cambio de estado en una transacción junto a su registro en el historial.
   - [`lib/semilla.ts`](lib/semilla.ts): datos de ejemplo reproducibles, con fechas relativas a hoy.
-- **Tests con [Vitest](https://vitest.dev)**, contra un Postgres real en memoria (PGlite): ciclo de vida completo de un ticket, cambios no permitidos, filtros y búsqueda, códigos de inventario y datos de ejemplo.
+- **Tests con [Vitest](https://vitest.dev)**, contra un Postgres real en memoria (PGlite): ciclo de vida completo de un ticket, cambios no permitidos, filtros y búsqueda, códigos de inventario y datos de ejemplo. El calendario hábil se prueba con viernes, fines de semana, Navidad, cambio de horario y la ida y vuelta entre sumar y medir tiempo hábil.
 - GitHub Actions corre los tests y el build en cada push.
 
 ## Desarrollo local
@@ -89,8 +92,14 @@ Para cambiar el esquema: edita `lib/db/esquema.ts` y genera la migración con `n
 ## Hoja de ruta
 
 - [x] Tickets con plazos, historial y asignación; inventario; panel; demo pública con datos de ejemplo.
+- [x] Plazos en horas hábiles, con feriados y pausa mientras el ticket está en espera.
+- [ ] Portal para que cualquier funcionario pida ayuda y siga su ticket por folio.
+- [ ] «Mis tickets» y asignación automática.
+- [ ] Tickets relacionados: duplicados y problemas que agrupan varios tickets.
+- [ ] Base de conocimiento y respuestas predefinidas.
+- [ ] Métricas de tiempos y encuesta de satisfacción.
+- [ ] Inventario con garantía, historial de cambios y mantenciones.
 - [ ] Inicio de sesión con roles (quien pide ayuda y técnico).
-- [ ] Plazos en horas hábiles, con feriados.
 - [ ] Avisos por correo al solicitante cuando su ticket se resuelve.
 - [ ] Adjuntar capturas de pantalla a un ticket.
 

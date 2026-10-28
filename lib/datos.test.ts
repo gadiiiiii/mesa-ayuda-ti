@@ -18,6 +18,7 @@ import { sembrar } from "./semilla";
 import { esquemaEquipo, esquemaTicketNuevo } from "./validacion";
 
 const H = 3_600_000;
+// Miércoles 28 de octubre de 2026, 9:00 en Chile.
 const t0 = new Date("2026-10-28T12:00:00Z");
 const despues = (h: number) => new Date(t0.getTime() + h * H);
 
@@ -57,7 +58,11 @@ describe("ciclo de vida de un ticket", () => {
 
     const d = (await obtenerTicket(bd, id))!;
     expect(d.ticket).toMatchObject({ estado: "cerrado", tecnico: "Diego Fuentes" });
-    expect(d.ticket.venceEn).toEqual(despues(8));
+    // Alta: 8 h hábiles desde el miércoles 9:00, más la hora en espera (12:00 a 13:00) = 9 h:
+    // 8,5 h el miércoles (hasta las 17:30) y media hora el jueves → jueves 9:00.
+    expect(d.ticket.minutosPausa).toBe(60);
+    expect(d.ticket.pausadoDesde).toBeNull();
+    expect(d.ticket.venceEn).toEqual(new Date("2026-10-29T12:00:00Z"));
     expect(d.ticket.resueltoEn).toEqual(despues(6));
     expect(plazo(d.ticket, despues(100)).estado).toBe("cumplido");
     expect(d.eventos.map((e) => [e.tipo, e.hacia])).toEqual([

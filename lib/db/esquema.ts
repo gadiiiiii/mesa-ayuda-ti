@@ -42,6 +42,10 @@ export const tickets = pgTable(
     actualizadoEn: momento("actualizado_en").notNull().defaultNow(),
     venceEn: momento("vence_en").notNull(),
     resueltoEn: momento("resuelto_en"),
+    /** Desde cuándo está en espera (el plazo no corre); null si no lo está. */
+    pausadoDesde: momento("pausado_desde"),
+    /** Minutos hábiles que el ticket pasó en espera; alargan el plazo. */
+    minutosPausa: integer("minutos_pausa").notNull().default(0),
   },
   (t) => [index("tickets_estado_idx").on(t.estado), index("tickets_equipo_idx").on(t.equipoId)],
 );

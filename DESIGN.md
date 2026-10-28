@@ -56,7 +56,7 @@ Pesos: 400, 500, 600 y 700. Títulos en 700 con interletrado −0,01 em. Sin may
 
 ## Componentes
 
-- **Barra de plazo:** 6 px de alto, pista `muted`. Relleno `muted-foreground` a tiempo, `warning` en el último cuarto y `destructive` vencido (llena). El texto del plazo va al lado o debajo, con ícono de reloj o de alerta.
+- **Barra de plazo:** 6 px de alto, pista `muted`. Mide tiempo hábil. Relleno `muted-foreground` a tiempo, `warning` en el último cuarto, `destructive` vencido (llena) y `muted-foreground` al 40 % en pausa. El texto del plazo va encima, con ícono de reloj, alerta o pausa («Quedan 3 h hábiles», «Vencido hace 2 h hábiles», «En pausa, quedan 6 h hábiles»).
 - **Estado del ticket:** ícono + nombre. Abierto (círculo vacío), En curso (círculo a medias, `primary`), En espera (pausa), Resuelto (check, `success`), Cerrado (archivo, apagado).
 - **Prioridad:** barras de señal de 1 a 4 + nombre. Urgente en `destructive`, Alta en `warning`, Media y Baja en tinta normal.
 - **Etiqueta de inventario:** el código en mono, borde fino y una franja a la izquierda, como la etiqueta pegada en el equipo.

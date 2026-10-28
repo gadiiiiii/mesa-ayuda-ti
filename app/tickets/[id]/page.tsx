@@ -5,7 +5,8 @@ import { CheckCircle2Icon, ChevronLeftIcon } from "lucide-react";
 import { obtenerTicket } from "@/lib/datos";
 import { obtenerBD } from "@/lib/db";
 import { NOMBRE_CATEGORIA, NOMBRE_TIPO } from "@/lib/dominio";
-import { formatearFechaHora } from "@/lib/formato";
+import { formatearConDia, formatearFechaHora } from "@/lib/formato";
+import { TEXTO_HORARIO } from "@/lib/horario";
 import { EstadoTicket, EtiquetaInventario, Folio, Plazo, PrioridadTicket } from "../../_componentes/Insignias";
 import { texto, type Parametros } from "../../_componentes/parametros";
 import AccionesEstado from "./AccionesEstado";
@@ -106,8 +107,8 @@ export default async function PaginaTicket({ params, searchParams }: Props) {
               <dd>{NOMBRE_CATEGORIA[t.categoria]}</dd>
               <dt className="text-muted-foreground">Creado</dt>
               <dd>{formatearFechaHora(t.creadoEn, ahora)}</dd>
-              <dt className="text-muted-foreground">Vence</dt>
-              <dd>{formatearFechaHora(t.venceEn, ahora)}</dd>
+              <dt className="text-muted-foreground">{t.pausadoDesde ? "En pausa" : "Vence"}</dt>
+              <dd>{t.pausadoDesde ? `desde ${formatearFechaHora(t.pausadoDesde, ahora)}` : formatearConDia(t.venceEn)}</dd>
               {t.resueltoEn && (
                 <>
                   <dt className="text-muted-foreground">Resuelto</dt>
@@ -128,6 +129,9 @@ export default async function PaginaTicket({ params, searchParams }: Props) {
                 )}
               </dd>
             </dl>
+            <p className="mt-4 border-t border-border pt-3 text-sm text-muted-foreground">
+              El plazo corre {TEXTO_HORARIO}, y se detiene mientras el ticket está en espera.
+            </p>
           </section>
         </aside>
       </div>
